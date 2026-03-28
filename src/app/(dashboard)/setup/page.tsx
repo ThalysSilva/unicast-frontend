@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { LoadingState } from "@/components/ui/loading-state";
+import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData } from "@/lib/api";
 import type {
   ApiMessage,
@@ -37,10 +39,6 @@ const statusOptions: StudentStatus[] = [
 ];
 
 export default function SetupPage() {
-  const [campuses, setCampuses] = useState<Campus[]>([]);
-  const [programs, setPrograms] = useState<Program[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
   const [message, setMessage] = useState<string | null>(null);
 
   const campusForm = useForm({
@@ -67,39 +65,53 @@ export default function SetupPage() {
       status: "ACTIVE" as StudentStatus,
     },
   });
+  const selectedCampusId = useWatch({
+    control: programForm.control,
+    name: "campus_id",
+  });
+  const selectedStudentStatus = useWatch({
+    control: studentForm.control,
+    name: "status",
+  });
 
-  const load = async () => {
-    const campusRes = await apiRequest<ApiResponse<Campus[]>>("/campus");
-    const campusData = extractData(campusRes);
-    setCampuses(campusData);
+  const setupQuery = useApiQuery({
+    queryKey: ["setup-data"],
+    queryFn: async () => {
+      const campusRes = await apiRequest<ApiResponse<Campus[]>>("/campus");
+      const campuses = extractData(campusRes);
 
-    const programResults = await Promise.allSettled(
-      campusData.map((campus) =>
-        apiRequest<ApiResponse<Program[]>>(`/program/${campus.id}`)
-      )
-    );
-    const programData = programResults.flatMap((res) => {
-      if (res.status !== "fulfilled") return [];
-      return extractData(res.value);
-    });
-    setPrograms(programData);
+      const programResults = await Promise.allSettled(
+        campuses.map((campus) =>
+          apiRequest<ApiResponse<Program[]>>(`/program/${campus.id}`)
+        )
+      );
+      const programs = programResults.flatMap((res) => {
+        if (res.status !== "fulfilled") return [];
+        return extractData(res.value);
+      });
 
-    const [courseRes, studentRes] = await Promise.allSettled([
-      apiRequest<ApiResponse<Course[]>>("/course/any"),
-      apiRequest<ApiResponse<Student[]>>("/student"),
-    ]);
+      const [courseRes, studentRes] = await Promise.allSettled([
+        apiRequest<ApiResponse<Course[]>>("/course/any"),
+        apiRequest<ApiResponse<Student[]>>("/student"),
+      ]);
 
-    if (courseRes.status === "fulfilled") {
-      setCourses(extractData(courseRes.value));
-    }
-    if (studentRes.status === "fulfilled") {
-      setStudents(extractData(studentRes.value));
-    }
-  };
+      return {
+        campuses,
+        programs,
+        courses:
+          courseRes.status === "fulfilled" ? extractData(courseRes.value) : [],
+        students:
+          studentRes.status === "fulfilled"
+            ? extractData(studentRes.value)
+            : [],
+      };
+    },
+  });
 
-  useEffect(() => {
-    load();
-  }, []);
+  const campuses = setupQuery.data?.campuses ?? [];
+  const programs = setupQuery.data?.programs ?? [];
+  const courses = setupQuery.data?.courses ?? [];
+  const students = setupQuery.data?.students ?? [];
 
   const handleMessage = (text: string) => {
     setMessage(text);
@@ -113,7 +125,7 @@ export default function SetupPage() {
     });
     handleMessage(res.message ?? "Campus criado");
     campusForm.reset();
-    load();
+    await setupQuery.refetch();
   };
 
   const createProgram = async (values: {
@@ -128,7 +140,7 @@ export default function SetupPage() {
     });
     handleMessage(res.message ?? "Programa criado");
     programForm.reset({ ...values, name: "", description: "" });
-    load();
+    await setupQuery.refetch();
   };
 
   const createCourse = async (values: {
@@ -143,7 +155,7 @@ export default function SetupPage() {
     });
     handleMessage(res.message ?? "Disciplina criada");
     courseForm.reset({ ...values, name: "", description: "" });
-    load();
+    await setupQuery.refetch();
   };
 
   const createStudent = async (values: {
@@ -174,7 +186,7 @@ export default function SetupPage() {
       phone: "",
       annotation: "",
     });
-    load();
+    await setupQuery.refetch();
   };
 
   return (
@@ -188,6 +200,16 @@ export default function SetupPage() {
       {message ? (
         <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
           {message}
+        </div>
+      ) : null}
+
+      {setupQuery.isLoading ? (
+        <LoadingState label="Carregando entidades base..." />
+      ) : null}
+
+      {setupQuery.isError ? (
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {setupQuery.error.message}
         </div>
       ) : null}
 
@@ -226,8 +248,10 @@ export default function SetupPage() {
             <div className="space-y-2">
               <Label>Campus</Label>
               <Select
-                value={programForm.watch("campus_id")}
-                onValueChange={(value) => programForm.setValue("campus_id", value)}
+                value={selectedCampusId}
+                onValueChange={(value) =>
+                  programForm.setValue("campus_id", value ?? "")
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um campus" />
@@ -322,7 +346,7 @@ export default function SetupPage() {
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select
-                  value={studentForm.watch("status")}
+                  value={selectedStudentStatus}
                   onValueChange={(value) =>
                     studentForm.setValue("status", value as StudentStatus)
                   }

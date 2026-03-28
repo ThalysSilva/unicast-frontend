@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LoadingState } from "@/components/ui/loading-state";
 import {
   Select,
   SelectContent,
@@ -23,8 +25,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useApiMutation } from "@/hooks/use-api-mutation";
+import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData } from "@/lib/api";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
+import { queryKeys } from "@/lib/query-keys";
 import type {
   ApiMessage,
   ApiResponse,
@@ -32,6 +37,9 @@ import type {
   Student,
   StudentStatus,
 } from "@/lib/types";
+
+const EMPTY_STUDENTS: Student[] = [];
+const EMPTY_COURSES: Course[] = [];
 
 const statusFilters: Array<StudentStatus | "ALL"> = [
   "ALL",
@@ -43,8 +51,6 @@ const statusFilters: Array<StudentStatus | "ALL"> = [
 ];
 
 export default function StudentsPage() {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StudentStatus | "ALL">("ALL");
   const [courseId, setCourseId] = useState("");
@@ -52,23 +58,49 @@ export default function StudentsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const load = async () => {
-    const [studentsRes, courseRes] = await Promise.allSettled([
-      apiRequest<ApiResponse<Student[]>>("/student"),
-      apiRequest<ApiResponse<Course[]>>("/course/any"),
-    ]);
+  const studentsQuery = useApiQuery({
+    queryKey: queryKeys.students(),
+    queryFn: async () => {
+      const response = await apiRequest<ApiResponse<Student[]>>("/student");
+      return extractData(response);
+    },
+  });
 
-    if (studentsRes.status === "fulfilled") {
-      setStudents(extractData(studentsRes.value));
-    }
-    if (courseRes.status === "fulfilled") {
-      setCourses(extractData(courseRes.value));
-    }
-  };
+  const coursesQuery = useApiQuery({
+    queryKey: queryKeys.courses(),
+    queryFn: async () => {
+      const response = await apiRequest<ApiResponse<Course[]>>("/course/any");
+      return extractData(response);
+    },
+  });
 
-  useEffect(() => {
-    load();
-  }, []);
+  const importStudentsMutation = useApiMutation<ApiMessage, FormData>({
+    mutationFn: async (formData) =>
+      apiRequest<ApiMessage>(`/course/${courseId}/students/import?mode=${importMode}`, {
+        method: "POST",
+        body: formData,
+      }),
+    invalidateQueryKeys: [queryKeys.students()],
+    onSuccess: (res) => {
+      setMessage(res.message ?? "CSV importado");
+      setFile(null);
+    },
+  });
+
+  const removeStudentMutation = useApiMutation<ApiMessage, string>({
+    mutationFn: async (studentId) =>
+      apiRequest<ApiMessage>(`/student/${studentId}`, { method: "DELETE" }),
+    invalidateQueryKeys: [queryKeys.students()],
+    onSuccess: () => {
+      setMessage("Aluno removido");
+    },
+  });
+
+  const students = studentsQuery.data ?? EMPTY_STUDENTS;
+  const courses = coursesQuery.data ?? EMPTY_COURSES;
+  const isLoading = studentsQuery.isLoading || coursesQuery.isLoading;
+  const error =
+    studentsQuery.error?.message ?? coursesQuery.error?.message ?? null;
 
   const filtered = useMemo(() => {
     return students.filter((student) => {
@@ -90,23 +122,7 @@ export default function StudentsPage() {
     if (!file || !courseId) return;
     const formData = new FormData();
     formData.append("file", file);
-
-    const res = await apiRequest<ApiMessage>(
-      `/course/${courseId}/students/import?mode=${importMode}`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-    setMessage(res.message ?? "CSV importado");
-    setFile(null);
-    load();
-  };
-
-  const removeStudent = async (studentId: string) => {
-    await apiRequest<ApiMessage>(`/student/${studentId}`, { method: "DELETE" });
-    setMessage("Aluno removido");
-    load();
+    await importStudentsMutation.mutateAsync(formData);
   };
 
   return (
@@ -123,6 +139,12 @@ export default function StudentsPage() {
         </div>
       ) : null}
 
+      {error ? (
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      ) : null}
+
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
           <h2 className="text-lg font-semibold">Lista inteligente</h2>
@@ -134,7 +156,7 @@ export default function StudentsPage() {
             />
             <Select
               value={status}
-              onValueChange={(value) => setStatus(value as typeof status)}
+              onValueChange={(value) => setStatus((value ?? "ALL") as typeof status)}
             >
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Status" />
@@ -149,50 +171,67 @@ export default function StudentsPage() {
             </Select>
           </div>
           <div className="mt-4 overflow-hidden rounded-2xl border border-border/60">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Aluno</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Contato</TableHead>
-                  <TableHead className="text-right">Acoes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>
-                      <p className="font-medium text-foreground">
-                        {student.name || "Sem nome"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Matricula {student.studentId}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {studentStatusLabel(student.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-sm">{student.email ?? "-"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatPhone(student.phone)}
-                      </p>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeStudent(student.id)}
-                      >
-                        Remover
-                      </Button>
-                    </TableCell>
+            {isLoading ? (
+              <LoadingState
+                label="Carregando alunos e disciplinas..."
+                className="rounded-none border-0"
+              />
+            ) : filtered.length ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Aluno</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Contato</TableHead>
+                    <TableHead className="text-right">Acoes</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell>
+                        <p className="font-medium text-foreground">
+                          {student.name || "Sem nome"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Matricula {student.studentId}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {studentStatusLabel(student.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm">{student.email ?? "-"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatPhone(student.phone)}
+                        </p>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={removeStudentMutation.isPending}
+                          onClick={() => removeStudentMutation.mutate(student.id)}
+                        >
+                          {removeStudentMutation.isPending &&
+                          removeStudentMutation.variables === student.id
+                            ? "Removendo..."
+                            : "Remover"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <EmptyState
+                title="Nenhum aluno encontrado"
+                description="Ajuste os filtros ou importe um CSV para popular a lista."
+                className="rounded-none border-0"
+              />
+            )}
           </div>
         </Card>
 
@@ -204,8 +243,11 @@ export default function StudentsPage() {
           <div className="mt-4 flex flex-col gap-4">
             <div className="space-y-2">
               <Label>Disciplina</Label>
-              <Select value={courseId} onValueChange={setCourseId}>
-                <SelectTrigger>
+              <Select
+                value={courseId}
+                onValueChange={(value) => setCourseId(value ?? "")}
+              >
+                <SelectTrigger disabled={coursesQuery.isLoading}>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
@@ -219,8 +261,11 @@ export default function StudentsPage() {
             </div>
             <div className="space-y-2">
               <Label>Modo de importacao</Label>
-              <Select value={importMode} onValueChange={setImportMode}>
-                <SelectTrigger>
+              <Select
+                value={importMode}
+                onValueChange={(value) => setImportMode(value ?? "upsert")}
+              >
+                <SelectTrigger disabled={importStudentsMutation.isPending}>
                   <SelectValue placeholder="Modo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -234,13 +279,17 @@ export default function StudentsPage() {
               <Input
                 type="file"
                 accept=".csv"
-                onChange={(event) =>
-                  setFile(event.target.files?.[0] ?? null)
-                }
+                disabled={importStudentsMutation.isPending}
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               />
             </div>
-            <Button onClick={handleImport} disabled={!file || !courseId}>
-              Importar alunos
+            <Button
+              onClick={handleImport}
+              disabled={!file || !courseId || importStudentsMutation.isPending}
+            >
+              {importStudentsMutation.isPending
+                ? "Importando..."
+                : "Importar alunos"}
             </Button>
           </div>
         </Card>

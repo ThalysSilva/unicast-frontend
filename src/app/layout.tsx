@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Providers } from "@/components/providers";
 import { Fraunces, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
@@ -29,7 +30,7 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${fraunces.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

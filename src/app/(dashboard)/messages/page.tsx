@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LoadingState } from "@/components/ui/loading-state";
 import {
   Select,
   SelectContent,
@@ -18,8 +20,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useApiMutation } from "@/hooks/use-api-mutation";
+import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData, getAuth } from "@/lib/api";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
+import { queryKeys } from "@/lib/query-keys";
 import type {
   ApiMessage,
   ApiResponse,
@@ -28,10 +33,11 @@ import type {
   WhatsappInstance,
 } from "@/lib/types";
 
+const EMPTY_STUDENTS: Student[] = [];
+const EMPTY_SMTP: SmtpInstance[] = [];
+const EMPTY_WHATSAPP: WhatsappInstance[] = [];
+
 export default function MessagesPage() {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [smtp, setSmtp] = useState<SmtpInstance[]>([]);
-  const [whatsapp, setWhatsapp] = useState<WhatsappInstance[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -45,29 +51,70 @@ export default function MessagesPage() {
     },
   });
 
-  const load = async () => {
-    const [studentRes, smtpRes, whatsappRes] = await Promise.allSettled([
-      apiRequest<ApiResponse<Student[]>>("/student"),
-      apiRequest<ApiResponse<SmtpInstance[]>>("/smtp/instance"),
-      apiRequest<ApiResponse<{ instances: WhatsappInstance[] }>>(
-        "/whatsapp/instance"
-      ),
-    ]);
+  const studentsQuery = useApiQuery({
+    queryKey: queryKeys.students(),
+    queryFn: async () => {
+      const response = await apiRequest<ApiResponse<Student[]>>("/student");
+      return extractData(response);
+    },
+  });
 
-    if (studentRes.status === "fulfilled") {
-      setStudents(extractData(studentRes.value));
-    }
-    if (smtpRes.status === "fulfilled") {
-      setSmtp(extractData(smtpRes.value));
-    }
-    if (whatsappRes.status === "fulfilled") {
-      setWhatsapp(extractData(whatsappRes.value).instances ?? []);
-    }
-  };
+  const smtpQuery = useApiQuery({
+    queryKey: queryKeys.smtp(),
+    queryFn: async () => {
+      const response = await apiRequest<ApiResponse<SmtpInstance[]>>(
+        "/smtp/instance"
+      );
+      return extractData(response);
+    },
+  });
 
-  useEffect(() => {
-    load();
-  }, []);
+  const whatsappQuery = useApiQuery({
+    queryKey: queryKeys.whatsapp(),
+    queryFn: async () => {
+      const response = await apiRequest<
+        ApiResponse<{ instances: WhatsappInstance[] }>
+      >("/whatsapp/instance");
+      return extractData(response).instances ?? [];
+    },
+  });
+
+  const sendMessageMutation = useApiMutation<
+    ApiMessage,
+    {
+      from: string;
+      subject: string;
+      body: string;
+      smtp_id: string;
+      whatsapp_id: string;
+    }
+  >({
+    mutationFn: async (values) => {
+      const auth = getAuth();
+      return apiRequest<ApiMessage>("/message/send", {
+        method: "POST",
+        body: {
+          ...values,
+          to: validSelected,
+          jwe: auth?.jwe ?? "",
+        },
+      });
+    },
+    onSuccess: (res) => {
+      setMessage(res.message ?? "Mensagem enviada");
+    },
+  });
+
+  const students = studentsQuery.data ?? EMPTY_STUDENTS;
+  const smtp = smtpQuery.data ?? EMPTY_SMTP;
+  const whatsapp = whatsappQuery.data ?? EMPTY_WHATSAPP;
+  const isLoading =
+    studentsQuery.isLoading || smtpQuery.isLoading || whatsappQuery.isLoading;
+  const error =
+    studentsQuery.error?.message ??
+    smtpQuery.error?.message ??
+    whatsappQuery.error?.message ??
+    null;
 
   const toggleStudent = (id: string) => {
     setSelected((prev) =>
@@ -75,7 +122,12 @@ export default function MessagesPage() {
     );
   };
 
-  const selectedCount = useMemo(() => selected.length, [selected]);
+  const validSelected = selected.filter((id) =>
+    students.some((student) => student.id === id)
+  );
+  const selectedCount = validSelected.length;
+  const smtpId = useWatch({ control: form.control, name: "smtp_id" });
+  const whatsappId = useWatch({ control: form.control, name: "whatsapp_id" });
 
   const handleSend = async (values: {
     from: string;
@@ -84,20 +136,12 @@ export default function MessagesPage() {
     smtp_id: string;
     whatsapp_id: string;
   }) => {
-    if (!selected.length) {
+    if (!validSelected.length) {
       setMessage("Selecione ao menos um aluno");
       return;
     }
-    const auth = getAuth();
-    const res = await apiRequest<ApiMessage>("/message/send", {
-      method: "POST",
-      body: {
-        ...values,
-        to: selected,
-        jwe: auth?.jwe ?? "",
-      },
-    });
-    setMessage(res.message ?? "Mensagem enviada");
+
+    await sendMessageMutation.mutateAsync(values);
   };
 
   return (
@@ -114,6 +158,12 @@ export default function MessagesPage() {
         </div>
       ) : null}
 
+      {error ? (
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      ) : null}
+
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
           <h2 className="text-lg font-semibold">Selecionar alunos</h2>
@@ -121,31 +171,40 @@ export default function MessagesPage() {
             Marque quem deve receber a mensagem. O envio usa os IDs dos alunos.
           </p>
           <div className="mt-4 grid gap-3">
-            {students.map((student) => (
-              <button
-                key={student.id}
-                type="button"
-                onClick={() => toggleStudent(student.id)}
-                className={`flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition ${
-                  selected.includes(student.id)
-                    ? "border-primary bg-primary/10"
-                    : "border-border/60 bg-background"
-                }`}
-              >
-                <Checkbox checked={selected.includes(student.id)} />
-                <div className="flex-1">
-                  <p className="font-medium text-foreground">
-                    {student.name ?? "Sem nome"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {student.email ?? "-"} · {formatPhone(student.phone)}
-                  </p>
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  {studentStatusLabel(student.status)}
-                </Badge>
-              </button>
-            ))}
+            {isLoading ? (
+              <LoadingState label="Carregando alunos e integracoes..." />
+            ) : students.length ? (
+              students.map((student) => (
+                <button
+                  key={student.id}
+                  type="button"
+                  onClick={() => toggleStudent(student.id)}
+                  className={`flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                    selected.includes(student.id)
+                      ? "border-primary bg-primary/10"
+                      : "border-border/60 bg-background"
+                  }`}
+                >
+                  <Checkbox checked={selected.includes(student.id)} />
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">
+                      {student.name ?? "Sem nome"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {student.email ?? "-"} · {formatPhone(student.phone)}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {studentStatusLabel(student.status)}
+                  </Badge>
+                </button>
+              ))
+            ) : (
+              <EmptyState
+                title="Nenhum aluno disponivel"
+                description="Cadastre ou importe alunos antes de enviar comunicados."
+              />
+            )}
           </div>
         </Card>
 
@@ -159,10 +218,12 @@ export default function MessagesPage() {
               <div className="space-y-2">
                 <Label>SMTP</Label>
                 <Select
-                  value={form.watch("smtp_id")}
-                  onValueChange={(value) => form.setValue("smtp_id", value)}
+                  value={smtpId}
+                  onValueChange={(value) =>
+                    form.setValue("smtp_id", value ?? "")
+                  }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger disabled={isLoading || sendMessageMutation.isPending}>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -177,10 +238,12 @@ export default function MessagesPage() {
               <div className="space-y-2">
                 <Label>WhatsApp</Label>
                 <Select
-                  value={form.watch("whatsapp_id")}
-                  onValueChange={(value) => form.setValue("whatsapp_id", value)}
+                  value={whatsappId}
+                  onValueChange={(value) =>
+                    form.setValue("whatsapp_id", value ?? "")
+                  }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger disabled={isLoading || sendMessageMutation.isPending}>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -195,21 +258,38 @@ export default function MessagesPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="msg-from">Remetente</Label>
-              <Input id="msg-from" {...form.register("from")} />
+              <Input
+                id="msg-from"
+                disabled={sendMessageMutation.isPending}
+                {...form.register("from")}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="msg-subject">Assunto</Label>
-              <Input id="msg-subject" {...form.register("subject")} />
+              <Input
+                id="msg-subject"
+                disabled={sendMessageMutation.isPending}
+                {...form.register("subject")}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="msg-body">Mensagem</Label>
-              <Textarea id="msg-body" rows={5} {...form.register("body")} />
+              <Textarea
+                id="msg-body"
+                rows={5}
+                disabled={sendMessageMutation.isPending}
+                {...form.register("body")}
+              />
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                {selectedCount} aluno(s) selecionado(s)
+              {selectedCount} aluno(s) selecionado(s)
               </span>
-              <Button type="submit">Enviar mensagem</Button>
+              <Button type="submit" disabled={isLoading || sendMessageMutation.isPending}>
+                {sendMessageMutation.isPending
+                  ? "Enviando..."
+                  : "Enviar mensagem"}
+              </Button>
             </div>
           </form>
         </Card>

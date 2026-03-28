@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ export default function InvitesPage() {
   const form = useForm({
     defaultValues: { courseId: "", expiresAt: "" },
   });
+  const courseId = useWatch({ control: form.control, name: "courseId" });
 
   useEffect(() => {
     const load = async () => {
@@ -84,8 +85,8 @@ export default function InvitesPage() {
             <div className="space-y-2">
               <Label>Disciplina</Label>
               <Select
-                value={form.watch("courseId")}
-                onValueChange={(value) => form.setValue("courseId", value)}
+                value={courseId}
+                onValueChange={(value) => form.setValue("courseId", value ?? "")}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
