@@ -37,7 +37,8 @@ export const clearAuth = () => {
 
 const buildUrl = (path: string) => {
   if (path.startsWith("http")) return path;
-  return `${apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return `${apiBaseUrl}${normalized}`;
 };
 
 type RequestOptions = {

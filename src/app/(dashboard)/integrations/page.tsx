@@ -7,6 +7,13 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,10 +32,22 @@ import type {
   WhatsappInstance,
 } from "@/lib/types";
 
+type ConnectResponse = {
+  status?: string;
+  message?: string;
+  pairingCode?: string;
+  code?: string;
+  base64?: string;
+  count?: number;
+  qrcode?: { code?: string; base64?: string };
+};
+
 export default function IntegrationsPage() {
   const [smtp, setSmtp] = useState<SmtpInstance[]>([]);
   const [whatsapp, setWhatsapp] = useState<WhatsappInstance[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [qrData, setQrData] = useState<ConnectResponse | null>(null);
+  const [qrOpen, setQrOpen] = useState(false);
 
   const smtpForm = useForm({
     defaultValues: {
@@ -51,12 +70,15 @@ export default function IntegrationsPage() {
       ),
     ]);
 
+    let whatsappData: WhatsappInstance[] = [];
     if (smtpRes.status === "fulfilled") {
       setSmtp(extractData(smtpRes.value));
     }
     if (whatsappRes.status === "fulfilled") {
-      setWhatsapp(extractData(whatsappRes.value).instances ?? []);
+      whatsappData = extractData(whatsappRes.value).instances ?? [];
+      setWhatsapp(whatsappData);
     }
+    return { whatsappData };
   };
 
   useEffect(() => {
@@ -88,24 +110,45 @@ export default function IntegrationsPage() {
   };
 
   const createWhatsapp = async (values: { phone: string }) => {
-    const res = await apiRequest<ApiResponse<{ pairingCode?: string }>>(
+    const res = await apiRequest<ApiResponse<{ instanceId?: string }>>(
       "/whatsapp/instance",
       {
         method: "POST",
         body: values,
       }
     );
-    handleMessage(
-      res.message ?? `Instancia criada: ${res.data?.pairingCode ?? ""}`
-    );
+    handleMessage(res.message ?? "Instancia criada");
     whatsappForm.reset();
-    load();
+    const { whatsappData } = await load();
+    const created = whatsappData.find((item) => item.phone === values.phone);
+    if (created?.id) {
+      await connectInstance(created.id);
+    }
   };
 
   const action = async (path: string, method: string, success: string) => {
     await apiRequest<ApiMessage>(path, { method });
     handleMessage(success);
     load();
+  };
+
+  const connectInstance = async (instanceId: string) => {
+    const res = await apiRequest<ApiResponse<ConnectResponse>>(
+      `/whatsapp/instance/${instanceId}/connect`,
+      { method: "POST" }
+    );
+    if (res.data) {
+      setQrData(res.data);
+      setQrOpen(true);
+    }
+    handleMessage(res.message ?? "Conexao solicitada");
+  };
+
+  const resolveQrImage = (data?: ConnectResponse | null) => {
+    const raw = data?.base64 || data?.qrcode?.base64 || "";
+    if (!raw) return "";
+    if (raw.startsWith("data:image")) return raw;
+    return `data:image/png;base64,${raw}`;
   };
 
   return (
@@ -121,6 +164,35 @@ export default function IntegrationsPage() {
           {message}
         </div>
       ) : null}
+      <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Conectar WhatsApp</DialogTitle>
+            <DialogDescription>
+              Escaneie o QR Code no WhatsApp ou use o codigo de pareamento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4">
+            {resolveQrImage(qrData) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={resolveQrImage(qrData)}
+                alt="QR Code WhatsApp"
+                className="h-56 w-56 rounded-2xl border border-border/60 bg-white"
+              />
+            ) : (
+              <div className="rounded-2xl border border-border/60 bg-muted px-4 py-6 text-sm text-muted-foreground">
+                QR Code indisponivel. Tente novamente.
+              </div>
+            )}
+            {qrData?.pairingCode ? (
+              <div className="rounded-2xl border border-border/60 bg-background px-4 py-2 text-sm">
+                Codigo: <span className="font-semibold">{qrData.pairingCode}</span>
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
@@ -205,11 +277,7 @@ export default function IntegrationsPage() {
                           size="sm"
                           variant="outline"
                           onClick={() =>
-                            action(
-                              `/whatsapp/instance/${item.id}/connect`,
-                              "POST",
-                              "Conexao solicitada"
-                            )
+                            connectInstance(item.id)
                           }
                         >
                           Conectar

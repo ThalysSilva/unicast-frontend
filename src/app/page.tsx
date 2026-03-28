@@ -1,7 +1,8 @@
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
   return (
@@ -21,12 +22,24 @@ export default function Home() {
               backend do Unicast oferece.
             </p>
             <div className="flex flex-wrap gap-4">
-              <Button asChild size="lg">
-                <Link href="/login">Entrar como professor</Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href="/student/register/demo">Registro do aluno</Link>
-              </Button>
+              <Link
+                href="/login"
+                className={cn(buttonVariants({ size: "lg" }))}
+              >
+                Entrar como professor
+              </Link>
+              <Link
+                href="/register"
+                className={cn(buttonVariants({ size: "lg", variant: "secondary" }))}
+              >
+                Criar conta docente
+              </Link>
+              <Link
+                href="/student/register/demo"
+                className={cn(buttonVariants({ size: "lg", variant: "outline" }))}
+              >
+                Registro do aluno
+              </Link>
             </div>
           </div>
           <Card className="flex flex-col gap-6 rounded-3xl border border-border/60 bg-white/80 p-6 shadow-lg">

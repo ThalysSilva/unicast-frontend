@@ -1,13 +1,19 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { clearAuth, getAuth } from "@/lib/api";
+import type { AuthSession } from "@/lib/types";
 
 export const Topbar = () => {
   const router = useRouter();
-  const auth = getAuth();
+  const [auth, setAuth] = useState<AuthSession | null>(null);
+
+  useEffect(() => {
+    setAuth(getAuth());
+  }, []);
 
   const handleLogout = () => {
     clearAuth();
