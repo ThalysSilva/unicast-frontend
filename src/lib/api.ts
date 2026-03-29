@@ -1,7 +1,10 @@
 import type { ApiResponse, AuthSession } from "@/lib/types";
 
 const AUTH_KEY = "unicast.auth";
+const AUTH_EVENT = "unicast:auth-changed";
 const DEFAULT_BASE_URL = "http://localhost:8080";
+
+type RefreshPayload = Pick<AuthSession, "accessToken" | "refreshToken" | "user">;
 
 export class ApiError extends Error {
   status: number;
@@ -28,11 +31,19 @@ export const getAuth = (): AuthSession | null => {
 export const setAuth = (session: AuthSession) => {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  window.dispatchEvent(new Event(AUTH_EVENT));
 };
 
 export const clearAuth = () => {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(AUTH_KEY);
+  window.dispatchEvent(new Event(AUTH_EVENT));
+};
+
+export const onAuthChange = (listener: () => void) => {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(AUTH_EVENT, listener);
+  return () => window.removeEventListener(AUTH_EVENT, listener);
 };
 
 const buildUrl = (path: string) => {
@@ -45,15 +56,45 @@ type RequestOptions = {
   method?: string;
   body?: unknown;
   headers?: HeadersInit;
+  skipAuthRefresh?: boolean;
 };
 
-export const apiRequest = async <T>(
+let refreshSessionPromise: Promise<AuthSession | null> | null = null;
+
+const parsePayload = async (response: Response) =>
+  response.json().catch(() => null) as Promise<unknown>;
+
+const extractErrorMessage = (payload: unknown) => {
+  if (payload && typeof payload === "object") {
+    const { error, message } = payload as {
+      error?: string;
+      message?: string;
+    };
+
+    if (error || message) {
+      return error ?? message ?? "Erro inesperado";
+    }
+  }
+
+  return "Erro inesperado";
+};
+
+const unwrapPayload = <T>(payload: ApiResponse<T> | T): T => {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return (payload as ApiResponse<T>).data;
+  }
+
+  return payload as T;
+};
+
+const performRequest = (
   path: string,
-  options: RequestOptions = {}
-): Promise<T> => {
-  const auth = getAuth();
+  options: RequestOptions,
+  auth: AuthSession | null
+) => {
   const headers = new Headers(options.headers);
-  if (auth?.accessToken) {
+
+  if (auth?.accessToken && path !== "/auth/refresh") {
     headers.set("Authorization", `Bearer ${auth.accessToken}`);
   }
 
@@ -64,28 +105,110 @@ export const apiRequest = async <T>(
     if (isFormData) {
       body = options.body as BodyInit;
     } else {
-      headers.set("Content-Type", "application/json");
+      if (!headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+      }
+
       body = JSON.stringify(options.body);
     }
   }
 
-  const response = await fetch(buildUrl(path), {
+  return fetch(buildUrl(path), {
     method: options.method ?? (body ? "POST" : "GET"),
     headers,
     body,
   });
+};
 
-  const payload = await response.json().catch(() => null);
+const refreshAuthSession = async (): Promise<AuthSession | null> => {
+  if (typeof window === "undefined") return null;
+
+  if (refreshSessionPromise) {
+    return refreshSessionPromise;
+  }
+
+  refreshSessionPromise = (async () => {
+    const currentSession = getAuth();
+
+    if (!currentSession?.refreshToken) {
+      clearAuth();
+      return null;
+    }
+
+    const response = await performRequest(
+      "/auth/refresh",
+      {
+        method: "POST",
+        body: { refreshToken: currentSession.refreshToken },
+        skipAuthRefresh: true,
+      },
+      null
+    );
+
+    const payload = await parsePayload(response);
+
+    if (!response.ok) {
+      clearAuth();
+      return null;
+    }
+
+    const refreshed = unwrapPayload(
+      payload as RefreshPayload | ApiResponse<RefreshPayload>
+    );
+
+    if (!refreshed?.accessToken || !refreshed?.refreshToken) {
+      clearAuth();
+      return null;
+    }
+
+    const nextSession: AuthSession = {
+      accessToken: refreshed.accessToken,
+      refreshToken: refreshed.refreshToken,
+      user: refreshed.user ?? currentSession.user,
+      jwe: currentSession.jwe,
+    };
+
+    setAuth(nextSession);
+    return nextSession;
+  })().finally(() => {
+    refreshSessionPromise = null;
+  });
+
+  return refreshSessionPromise;
+};
+
+export const apiRequest = async <T>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> => {
+  let response = await performRequest(path, options, getAuth());
+  let payload = await parsePayload(response);
+
+  if (
+    response.status === 401 &&
+    !options.skipAuthRefresh &&
+    path !== "/auth/login" &&
+    path !== "/auth/register" &&
+    path !== "/auth/refresh"
+  ) {
+    const refreshedSession = await refreshAuthSession();
+
+    if (refreshedSession?.accessToken) {
+      response = await performRequest(
+        path,
+        { ...options, skipAuthRefresh: true },
+        refreshedSession
+      );
+      payload = await parsePayload(response);
+    }
+  }
+
   if (!response.ok) {
-    const message = payload?.error || payload?.message || "Erro inesperado";
-    throw new ApiError(response.status, message);
+    throw new ApiError(response.status, extractErrorMessage(payload));
   }
+
   return payload as T;
 };
 
-export const extractData = <T>(payload: ApiResponse<T> | T): T => {
-  if (payload && typeof payload === "object" && "data" in payload) {
-    return (payload as ApiResponse<T>).data;
-  }
-  return payload as T;
-};
+export const extractData = <T>(payload: ApiResponse<T> | T): T =>
+  unwrapPayload(payload);

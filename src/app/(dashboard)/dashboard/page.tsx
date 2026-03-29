@@ -1,17 +1,28 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { PageHeader } from "@/components/layout/page-header";
 import { StatCard } from "@/components/layout/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useApiQuery } from "@/hooks/use-api-query";
-import { apiRequest, extractData, getAuth } from "@/lib/api";
+import { apiRequest, extractData, getAuth, onAuthChange } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { ApiResponse, Campus, Course, Program, Student } from "@/lib/types";
 
 export default function DashboardPage() {
-  const auth = getAuth();
+  const [userName, setUserName] = useState("Professor");
+
+  useEffect(() => {
+    const syncUser = () => {
+      setUserName(getAuth()?.user?.name ?? "Professor");
+    };
+
+    syncUser();
+    return onAuthChange(syncUser);
+  }, []);
 
   const summaryQuery = useApiQuery({
     queryKey: queryKeys.dashboardSummary(),
@@ -52,7 +63,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title={`Ola, ${auth?.user?.name ?? "Professor"}`}
+        title={`Ola, ${userName}`}
         description="Acompanhe o resumo das suas entidades e prossimos passos para manter as comunicacoes em dia."
         badge="Visao geral"
       />

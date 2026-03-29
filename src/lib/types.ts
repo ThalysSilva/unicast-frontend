@@ -61,6 +61,7 @@ export type WhatsappInstance = {
   id: string;
   instanceName?: string;
   phone: string;
+  connectionStatus?: string;
 };
 
 export type ApiMessage = {

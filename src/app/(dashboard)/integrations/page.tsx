@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -47,9 +48,19 @@ type ConnectResponse = {
   qrcode?: { code?: string; base64?: string };
 };
 
+type ConnectionStateResponse = ApiResponse<{ status?: string }>;
+type CreateWhatsappResponse = {
+  instanceId?: string;
+  qrCode?: string;
+  pairingCode?: string;
+};
+
+const CONNECTED_STATUSES = new Set(["open", "connected"]);
+
 export default function IntegrationsPage() {
   const [qrData, setQrData] = useState<ConnectResponse | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
+  const [qrInstanceId, setQrInstanceId] = useState<string | null>(null);
   const { showToast } = useToast();
 
   const smtpForm = useForm({
@@ -90,6 +101,32 @@ export default function IntegrationsPage() {
       title: text,
       variant: "success",
     });
+  };
+
+  const normalizeConnectionStatus = (status?: string) =>
+    status?.trim().toLowerCase() ?? "";
+
+  const syncWhatsappInstances = async () => {
+    const freshWhatsapp = await whatsappQuery.refetch();
+    return freshWhatsapp.data ?? [];
+  };
+
+  const handleQrOpenChange = (open: boolean) => {
+    setQrOpen(open);
+
+    if (!open) {
+      const instanceId = qrInstanceId;
+      setQrData(null);
+      setQrInstanceId(null);
+      void (async () => {
+        if (instanceId) {
+          await apiRequest<ConnectionStateResponse>(
+            `/whatsapp/instance/${instanceId}/status`
+          );
+        }
+        await syncWhatsappInstances();
+      })();
+    }
   };
 
   const createSmtpMutation = useApiMutation<
@@ -149,11 +186,11 @@ export default function IntegrationsPage() {
   });
 
   const createWhatsappMutation = useApiMutation<
-    ApiResponse<{ instanceId?: string }>,
+    ApiResponse<CreateWhatsappResponse>,
     { phone: string }
   >({
     mutationFn: async (values) =>
-      apiRequest<ApiResponse<{ instanceId?: string }>>("/whatsapp/instance", {
+      apiRequest<ApiResponse<CreateWhatsappResponse>>("/whatsapp/instance", {
         method: "POST",
         body: values,
       }),
@@ -161,14 +198,24 @@ export default function IntegrationsPage() {
     onSuccess: async (res, values) => {
       handleSuccess(res.message ?? "Instancia criada");
       whatsappForm.reset();
-      const freshWhatsapp = await whatsappQuery.refetch();
-      const created = (freshWhatsapp.data ?? []).find(
-        (item) => item.phone === values.phone
-      );
+      const instances = await syncWhatsappInstances();
+      const created = instances.find((item) => item.phone === values.phone);
 
       if (created?.id) {
+        setQrInstanceId(created.id);
         await connectInstanceMutation.mutateAsync(created.id);
+        return;
       }
+
+      setQrData({
+        code: res.data?.qrCode,
+        qrcode: {
+          code: res.data?.qrCode,
+          base64: res.data?.qrCode,
+        },
+        pairingCode: res.data?.pairingCode,
+      });
+      setQrOpen(true);
     },
   });
 
@@ -193,16 +240,11 @@ export default function IntegrationsPage() {
 
   const smtp = smtpQuery.data ?? [];
   const whatsapp = whatsappQuery.data ?? [];
+  const isQrLoading =
+    createWhatsappMutation.isPending || connectInstanceMutation.isPending;
   const isLoading = smtpQuery.isLoading || whatsappQuery.isLoading;
   const queryError = smtpQuery.error ?? whatsappQuery.error ?? null;
   const error = smtpQuery.error?.message ?? whatsappQuery.error?.message ?? null;
-  const pendingWhatsappAction = useMemo(() => {
-    if (actionMutation.variables?.path) return actionMutation.variables.path;
-    if (connectInstanceMutation.variables) {
-      return `/whatsapp/instance/${connectInstanceMutation.variables}/connect`;
-    }
-    return null;
-  }, [actionMutation.variables, connectInstanceMutation.variables]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -220,16 +262,23 @@ export default function IntegrationsPage() {
         </div>
       ) : null}
 
-      <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+      <Dialog open={qrOpen} onOpenChange={handleQrOpenChange}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Conectar WhatsApp</DialogTitle>
             <DialogDescription>
-              Escaneie o QR Code no WhatsApp ou use o codigo de pareamento.
+              {isQrLoading
+                ? "Criando a instancia e preparando o QR Code."
+                : "Escaneie o QR Code no WhatsApp ou use o codigo de pareamento."}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-4">
-            {resolveQrImage(qrData) ? (
+            {isQrLoading ? (
+              <LoadingState
+                label="Carregando QR Code do WhatsApp..."
+                className="min-h-56"
+              />
+            ) : resolveQrImage(qrData) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={resolveQrImage(qrData)}
@@ -343,9 +392,11 @@ export default function IntegrationsPage() {
           <h2 className="text-lg font-semibold">WhatsApp</h2>
           <form
             className="mt-4 flex flex-col gap-4"
-            onSubmit={whatsappForm.handleSubmit((values) =>
-              createWhatsappMutation.mutateAsync(values)
-            )}
+            onSubmit={whatsappForm.handleSubmit(async (values) => {
+              setQrData(null);
+              setQrInstanceId(null);
+              await createWhatsappMutation.mutateAsync(values);
+            })}
           >
             <div className="space-y-2">
               <Label htmlFor="whatsapp-phone">Telefone (com DDI)</Label>
@@ -377,88 +428,47 @@ export default function IntegrationsPage() {
                 <TableBody>
                   {whatsapp.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>{item.instanceName ?? item.id}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-2">
+                          <span>{item.instanceName ?? item.id}</span>
+                          {CONNECTED_STATUSES.has(
+                            normalizeConnectionStatus(item.connectionStatus)
+                          ) ? (
+                            <Badge
+                              variant="outline"
+                              className="w-fit border-emerald-200 bg-emerald-50 text-emerald-700"
+                            >
+                              Conectado
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </TableCell>
                       <TableCell>{item.phone}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex flex-wrap justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={
-                              connectInstanceMutation.isPending ||
-                              actionMutation.isPending
-                            }
-                            onClick={() => connectInstanceMutation.mutate(item.id)}
-                          >
-                            {connectInstanceMutation.isPending &&
-                            pendingWhatsappAction ===
-                              `/whatsapp/instance/${item.id}/connect`
-                              ? "Conectando..."
-                              : "Conectar"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={
-                              connectInstanceMutation.isPending ||
-                              actionMutation.isPending
-                            }
-                            onClick={() =>
-                              actionMutation.mutate({
-                                path: `/whatsapp/instance/${item.id}/status`,
-                                method: "GET",
-                                success: "Status consultado",
-                              })
-                            }
-                          >
-                            {actionMutation.isPending &&
-                            pendingWhatsappAction ===
-                              `/whatsapp/instance/${item.id}/status`
-                              ? "Consultando..."
-                              : "Status"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={
-                              connectInstanceMutation.isPending ||
-                              actionMutation.isPending
-                            }
-                            onClick={() =>
-                              actionMutation.mutate({
-                                path: `/whatsapp/instance/${item.id}/restart`,
-                                method: "POST",
-                                success: "Instancia reiniciada",
-                              })
-                            }
-                          >
-                            {actionMutation.isPending &&
-                            pendingWhatsappAction ===
-                              `/whatsapp/instance/${item.id}/restart`
-                              ? "Reiniciando..."
-                              : "Reiniciar"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={
-                              connectInstanceMutation.isPending ||
-                              actionMutation.isPending
-                            }
-                            onClick={() =>
-                              actionMutation.mutate({
-                                path: `/whatsapp/instance/${item.id}/logout`,
-                                method: "DELETE",
-                                success: "Logout realizado",
-                              })
-                            }
-                          >
-                            {actionMutation.isPending &&
-                            pendingWhatsappAction ===
-                              `/whatsapp/instance/${item.id}/logout`
-                              ? "Saindo..."
-                              : "Logout"}
-                          </Button>
+                          {!CONNECTED_STATUSES.has(
+                            normalizeConnectionStatus(item.connectionStatus)
+                          ) ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                connectInstanceMutation.isPending ||
+                                actionMutation.isPending
+                              }
+                              onClick={() => {
+                                setQrData(null);
+                                setQrInstanceId(item.id);
+                                setQrOpen(true);
+                                connectInstanceMutation.mutate(item.id);
+                              }}
+                            >
+                              {connectInstanceMutation.isPending &&
+                              connectInstanceMutation.variables === item.id
+                                ? "Conectando..."
+                                : "Conectar"}
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant="destructive"
@@ -475,7 +485,7 @@ export default function IntegrationsPage() {
                             }
                           >
                             {actionMutation.isPending &&
-                            pendingWhatsappAction ===
+                            actionMutation.variables?.path ===
                               `/whatsapp/instance/${item.id}`
                               ? "Removendo..."
                               : "Remover"}
