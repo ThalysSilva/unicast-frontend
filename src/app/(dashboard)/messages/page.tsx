@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData, getAuth } from "@/lib/api";
@@ -39,7 +40,7 @@ const EMPTY_WHATSAPP: WhatsappInstance[] = [];
 
 export default function MessagesPage() {
   const [selected, setSelected] = useState<string[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const form = useForm({
     defaultValues: {
@@ -101,7 +102,7 @@ export default function MessagesPage() {
       });
     },
     onSuccess: (res) => {
-      setMessage(res.message ?? "Mensagem enviada");
+      showToast({ title: res.message ?? "Mensagem enviada", variant: "success" });
     },
   });
 
@@ -110,11 +111,6 @@ export default function MessagesPage() {
   const whatsapp = whatsappQuery.data ?? EMPTY_WHATSAPP;
   const isLoading =
     studentsQuery.isLoading || smtpQuery.isLoading || whatsappQuery.isLoading;
-  const error =
-    studentsQuery.error?.message ??
-    smtpQuery.error?.message ??
-    whatsappQuery.error?.message ??
-    null;
 
   const toggleStudent = (id: string) => {
     setSelected((prev) =>
@@ -126,6 +122,10 @@ export default function MessagesPage() {
     students.some((student) => student.id === id)
   );
   const selectedCount = validSelected.length;
+  const queryError = useMemo(
+    () => studentsQuery.error ?? smtpQuery.error ?? whatsappQuery.error ?? null,
+    [studentsQuery.error, smtpQuery.error, whatsappQuery.error]
+  );
   const smtpId = useWatch({ control: form.control, name: "smtp_id" });
   const whatsappId = useWatch({ control: form.control, name: "whatsapp_id" });
 
@@ -137,7 +137,7 @@ export default function MessagesPage() {
     whatsapp_id: string;
   }) => {
     if (!validSelected.length) {
-      setMessage("Selecione ao menos um aluno");
+      showToast({ title: "Selecione ao menos um aluno", variant: "error" });
       return;
     }
 
@@ -151,18 +151,7 @@ export default function MessagesPage() {
         description="Envie comunicados via email e WhatsApp usando os alunos cadastrados."
         badge="Envio imediato"
       />
-
-      {message ? (
-        <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
-          {message}
-        </div>
-      ) : null}
-
-      {error ? (
-        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
+      <ToastOnError error={queryError} />
 
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">

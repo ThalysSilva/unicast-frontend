@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
@@ -12,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast-provider";
 import { apiRequest } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -25,8 +25,7 @@ type FormValues = z.infer<typeof schema>;
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const { showToast } = useToast();
   const {
     register,
     handleSubmit,
@@ -34,14 +33,18 @@ export default function RegisterPage() {
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   const onSubmit = async (values: FormValues) => {
-    setError(null);
-    setSuccess(null);
     try {
       await apiRequest("/auth/register", { method: "POST", body: values });
-      setSuccess("Cadastro realizado. Voce ja pode entrar.");
+      showToast({
+        title: "Cadastro realizado. Voce ja pode entrar.",
+        variant: "success",
+      });
       setTimeout(() => router.push("/login"), 800);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao cadastrar");
+      showToast({
+        title: err instanceof Error ? err.message : "Falha ao cadastrar",
+        variant: "error",
+      });
     }
   };
 
@@ -80,16 +83,6 @@ export default function RegisterPage() {
             <Label htmlFor="password">Senha</Label>
             <Input id="password" type="password" {...register("password")} />
           </div>
-          {success ? (
-            <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
-              {success}
-            </div>
-          ) : null}
-          {error ? (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {error}
-            </div>
-          ) : null}
           <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting ? "Criando..." : "Criar conta"}
           </Button>

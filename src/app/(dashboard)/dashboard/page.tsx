@@ -7,6 +7,7 @@ import { StatCard } from "@/components/layout/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
+import { ToastOnError } from "@/components/ui/toast-provider";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData, getAuth, onAuthChange } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
@@ -67,14 +68,11 @@ export default function DashboardPage() {
         description="Acompanhe o resumo das suas entidades e prossimos passos para manter as comunicacoes em dia."
         badge="Visao geral"
       />
+      <ToastOnError error={summaryQuery.error} />
 
       {summaryQuery.isLoading ? (
         <LoadingState label="Carregando resumo do painel..." />
-      ) : summaryQuery.isError ? (
-        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {summaryQuery.error.message}
-        </div>
-      ) : (
+      ) : !summaryQuery.isError ? (
         <>
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Campi" value={campuses.length} />
@@ -138,7 +136,7 @@ export default function DashboardPage() {
             </Card>
           </section>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

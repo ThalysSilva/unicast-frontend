@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData } from "@/lib/api";
@@ -56,7 +57,7 @@ export default function StudentsPage() {
   const [courseId, setCourseId] = useState("");
   const [importMode, setImportMode] = useState("upsert");
   const [file, setFile] = useState<File | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const studentsQuery = useApiQuery({
     queryKey: queryKeys.students(),
@@ -82,7 +83,7 @@ export default function StudentsPage() {
       }),
     invalidateQueryKeys: [queryKeys.students()],
     onSuccess: (res) => {
-      setMessage(res.message ?? "CSV importado");
+      showToast({ title: res.message ?? "CSV importado", variant: "success" });
       setFile(null);
     },
   });
@@ -92,15 +93,13 @@ export default function StudentsPage() {
       apiRequest<ApiMessage>(`/student/${studentId}`, { method: "DELETE" }),
     invalidateQueryKeys: [queryKeys.students()],
     onSuccess: () => {
-      setMessage("Aluno removido");
+      showToast({ title: "Aluno removido", variant: "success" });
     },
   });
 
   const students = studentsQuery.data ?? EMPTY_STUDENTS;
   const courses = coursesQuery.data ?? EMPTY_COURSES;
   const isLoading = studentsQuery.isLoading || coursesQuery.isLoading;
-  const error =
-    studentsQuery.error?.message ?? coursesQuery.error?.message ?? null;
 
   const filtered = useMemo(() => {
     return students.filter((student) => {
@@ -132,18 +131,7 @@ export default function StudentsPage() {
         description="Importe CSV, filtre status e acompanhe a situacao de cada aluno vinculado."
         badge="Gestao de turma"
       />
-
-      {message ? (
-        <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
-          {message}
-        </div>
-      ) : null}
-
-      {error ? (
-        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
+      <ToastOnError error={studentsQuery.error ?? coursesQuery.error} />
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">

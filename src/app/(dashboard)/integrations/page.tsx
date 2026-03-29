@@ -244,7 +244,6 @@ export default function IntegrationsPage() {
     createWhatsappMutation.isPending || connectInstanceMutation.isPending;
   const isLoading = smtpQuery.isLoading || whatsappQuery.isLoading;
   const queryError = smtpQuery.error ?? whatsappQuery.error ?? null;
-  const error = smtpQuery.error?.message ?? whatsappQuery.error?.message ?? null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -255,12 +254,6 @@ export default function IntegrationsPage() {
       />
 
       <ToastOnError error={queryError} />
-
-      {error ? (
-        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
 
       <Dialog open={qrOpen} onOpenChange={handleQrOpenChange}>
         <DialogContent className="max-w-sm">

@@ -16,13 +16,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/components/ui/toast-provider";
 import { apiRequest, extractData } from "@/lib/api";
 import type { ApiResponse, Course } from "@/lib/types";
 
 export default function InvitesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [invite, setInvite] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const form = useForm({
     defaultValues: { courseId: "", expiresAt: "" },
@@ -42,7 +43,7 @@ export default function InvitesPage() {
     expiresAt?: string;
   }) => {
     if (!values.courseId) {
-      setMessage("Selecione uma disciplina");
+      showToast({ title: "Selecione uma disciplina", variant: "error" });
       return;
     }
     const payload = values.expiresAt
@@ -58,7 +59,7 @@ export default function InvitesPage() {
     );
     const code = res.data?.code ?? Object.values(res.data ?? {})[0];
     setInvite(code ?? null);
-    setMessage("Convite criado com sucesso");
+    showToast({ title: "Convite criado com sucesso", variant: "success" });
   };
 
   return (
@@ -68,12 +69,6 @@ export default function InvitesPage() {
         description="Gere links para os alunos se cadastrarem no curso informado."
         badge="Auto-registro"
       />
-
-      {message ? (
-        <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
-          {message}
-        </div>
-      ) : null}
 
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">

@@ -1,21 +1,20 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast-provider";
 import { apiRequest } from "@/lib/api";
 import type { ApiMessage } from "@/lib/types";
 
 export default function StudentRegisterPage() {
   const params = useParams();
   const code = params?.code as string;
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const form = useForm({
     defaultValues: {
@@ -32,8 +31,6 @@ export default function StudentRegisterPage() {
     email?: string;
     phone?: string;
   }) => {
-    setMessage(null);
-    setError(null);
     try {
       const res = await apiRequest<ApiMessage>(
         `/invite/self-register/${code}`,
@@ -42,14 +39,14 @@ export default function StudentRegisterPage() {
           body: values,
         }
       );
-      setMessage(res.message ?? "Cadastro realizado");
+      showToast({ title: res.message ?? "Cadastro realizado", variant: "success" });
       form.reset();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Este aluno ja possui cadastro"
-      );
+      showToast({
+        title:
+          err instanceof Error ? err.message : "Este aluno ja possui cadastro",
+        variant: "error",
+      });
     }
   };
 
@@ -87,16 +84,6 @@ export default function StudentRegisterPage() {
             <Label htmlFor="phone">Telefone</Label>
             <Input id="phone" {...form.register("phone")} />
           </div>
-          {message ? (
-            <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
-              {message}
-            </div>
-          ) : null}
-          {error ? (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {error}
-            </div>
-          ) : null}
           <Button type="submit">Finalizar cadastro</Button>
         </form>
       </Card>

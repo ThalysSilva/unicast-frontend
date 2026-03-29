@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -65,9 +66,9 @@ const setupSections = [
 ] as const;
 
 export default function SetupPage() {
-  const [message, setMessage] = useState<string | null>(null);
   const [activeSection, setActiveSection] =
     useState<(typeof setupSections)[number]["value"]>("campus");
+  const { showToast } = useToast();
 
   const campusForm = useForm({
     defaultValues: { name: "", description: "" },
@@ -142,17 +143,12 @@ export default function SetupPage() {
   const courses = setupQuery.data?.courses ?? [];
   const students = setupQuery.data?.students ?? [];
 
-  const handleMessage = (text: string) => {
-    setMessage(text);
-    setTimeout(() => setMessage(null), 4000);
-  };
-
   const createCampus = async (values: { name: string; description: string }) => {
     const res = await apiRequest<ApiMessage>("/campus", {
       method: "POST",
       body: values,
     });
-    handleMessage(res.message ?? "Campus criado");
+    showToast({ title: res.message ?? "Campus criado", variant: "success" });
     campusForm.reset();
     await setupQuery.refetch();
   };
@@ -167,7 +163,7 @@ export default function SetupPage() {
       method: "POST",
       body: values,
     });
-    handleMessage(res.message ?? "Programa criado");
+    showToast({ title: res.message ?? "Programa criado", variant: "success" });
     programForm.reset({ ...values, name: "", description: "" });
     await setupQuery.refetch();
   };
@@ -182,7 +178,7 @@ export default function SetupPage() {
       method: "POST",
       body: values,
     });
-    handleMessage(res.message ?? "Disciplina criada");
+    showToast({ title: res.message ?? "Disciplina criada", variant: "success" });
     courseForm.reset({ ...values, name: "", description: "" });
     await setupQuery.refetch();
   };
@@ -206,7 +202,7 @@ export default function SetupPage() {
       method: "POST",
       body: payload,
     });
-    handleMessage(res.message ?? "Aluno criado");
+    showToast({ title: res.message ?? "Aluno criado", variant: "success" });
     studentForm.reset({
       ...values,
       studentId: "",
@@ -232,21 +228,10 @@ export default function SetupPage() {
         description="Configure a base em etapas. Escolha o que deseja gerenciar agora e edite uma entidade por vez."
         badge="Setup guiado"
       />
-
-      {message ? (
-        <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
-          {message}
-        </div>
-      ) : null}
+      <ToastOnError error={setupQuery.error} />
 
       {setupQuery.isLoading ? (
         <LoadingState label="Carregando estrutura academica..." />
-      ) : null}
-
-      {setupQuery.isError ? (
-        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {setupQuery.error.message}
-        </div>
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

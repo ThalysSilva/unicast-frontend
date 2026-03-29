@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast-provider";
 import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -26,7 +26,7 @@ type FormValues = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const {
     register,
     handleSubmit,
@@ -34,7 +34,6 @@ export default function LoginPage() {
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   const onSubmit = async (values: FormValues) => {
-    setError(null);
     try {
       const payload = await apiRequest<ApiResponse<AuthSession>>("/auth/login", {
         method: "POST",
@@ -45,7 +44,10 @@ export default function LoginPage() {
         router.push("/dashboard");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao autenticar");
+      showToast({
+        title: err instanceof Error ? err.message : "Falha ao autenticar",
+        variant: "error",
+      });
     }
   };
 
@@ -80,11 +82,6 @@ export default function LoginPage() {
             <Label htmlFor="password">Senha</Label>
             <Input id="password" type="password" {...register("password")} />
           </div>
-          {error ? (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {error}
-            </div>
-          ) : null}
           <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting ? "Entrando..." : "Entrar"}
           </Button>
