@@ -13,6 +13,38 @@ import { apiRequest, extractData, getAuth, onAuthChange } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { ApiResponse, Campus, Course, Program, Student } from "@/lib/types";
 
+const isProgramLike = (value: unknown): value is Program => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<Program>;
+
+  return (
+    typeof candidate.id === "string" &&
+    candidate.id.length > 0 &&
+    typeof candidate.name === "string" &&
+    candidate.name.length > 0
+  );
+};
+
+const extractPrograms = (
+  payload: ApiResponse<Program[]> | Program[] | unknown,
+  campus: Campus
+) => {
+  const data = extractData(payload as ApiResponse<Program[]> | Program[]);
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.filter(
+    (item): item is Program =>
+      isProgramLike(item) &&
+      (item.id !== campus.id || item.name !== campus.name)
+  );
+};
+
 export default function DashboardPage() {
   const [userName, setUserName] = useState("Professor");
 
@@ -37,9 +69,9 @@ export default function DashboardPage() {
         )
       );
 
-      const programs = programResults.flatMap((result) => {
+      const programs = programResults.flatMap((result, index) => {
         if (result.status !== "fulfilled") return [];
-        return extractData(result.value);
+        return extractPrograms(result.value, campuses[index]);
       });
 
       const [courseRes, studentRes] = await Promise.all([
@@ -57,7 +89,9 @@ export default function DashboardPage() {
   });
 
   const campuses = summaryQuery.data?.campuses ?? [];
-  const programs = summaryQuery.data?.programs ?? [];
+  const programs = Array.from(
+    new Map((summaryQuery.data?.programs ?? []).map((program) => [program.id, program])).values()
+  );
   const courses = summaryQuery.data?.courses ?? [];
   const students = summaryQuery.data?.students ?? [];
 
@@ -76,7 +110,7 @@ export default function DashboardPage() {
         <>
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Campi" value={campuses.length} />
-            <StatCard label="Programas" value={programs.length} />
+            <StatCard label="Cursos" value={programs.length} />
             <StatCard label="Disciplinas" value={courses.length} />
             <StatCard label="Alunos" value={students.length} />
           </section>
@@ -89,7 +123,7 @@ export default function DashboardPage() {
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {[
                   "Cadastre ou atualize o campus",
-                  "Crie os programas ativos",
+                  "Crie os cursos ativos",
                   "Configure as disciplinas",
                   "Importe o CSV de alunos",
                   "Ative SMTP e WhatsApp",

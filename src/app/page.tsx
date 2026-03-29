@@ -53,7 +53,7 @@ export default function Home() {
             </div>
             <div className="space-y-3">
               <div className="rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm">
-                1. Cadastre campus, programa e disciplina.
+                1. Cadastre campus, curso e disciplina.
               </div>
               <div className="rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm">
                 2. Importe alunos ou crie convites.

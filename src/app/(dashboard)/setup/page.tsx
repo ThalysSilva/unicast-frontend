@@ -31,16 +31,39 @@ import type {
   Course,
   Program,
   Student,
-  StudentStatus,
 } from "@/lib/types";
 
-const statusOptions: StudentStatus[] = [
-  "ACTIVE",
-  "PENDING",
-  "LOCKED",
-  "CANCELED",
-  "GRADUATED",
-];
+const isProgramLike = (value: unknown): value is Program => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<Program>;
+
+  return (
+    typeof candidate.id === "string" &&
+    candidate.id.length > 0 &&
+    typeof candidate.name === "string" &&
+    candidate.name.length > 0
+  );
+};
+
+const extractPrograms = (
+  payload: ApiResponse<Program[]> | Program[] | unknown,
+  campus: Campus
+) => {
+  const data = extractData(payload as ApiResponse<Program[]> | Program[]);
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.filter(
+    (item): item is Program =>
+      isProgramLike(item) &&
+      (item.id !== campus.id || item.name !== campus.name)
+  );
+};
 
 const setupSections = [
   {
@@ -50,8 +73,8 @@ const setupSections = [
   },
   {
     value: "program",
-    label: "Programa",
-    description: "Organize cursos ou frentes por campus.",
+    label: "Curso",
+    description: "Cadastre cursos como Ciencia da Computacao ou Biologia.",
   },
   {
     value: "course",
@@ -82,16 +105,17 @@ export default function SetupPage() {
     },
   });
   const courseForm = useForm({
-    defaultValues: { name: "", description: "", year: 2025, semester: 1 },
+    defaultValues: {
+      name: "",
+      description: "",
+      program_id: "",
+      year: 2025,
+      semester: 1,
+    },
   });
   const studentForm = useForm({
     defaultValues: {
       studentId: "",
-      name: "",
-      email: "",
-      phone: "",
-      annotation: "",
-      status: "ACTIVE" as StudentStatus,
     },
   });
 
@@ -99,9 +123,9 @@ export default function SetupPage() {
     control: programForm.control,
     name: "campus_id",
   });
-  const selectedStudentStatus = useWatch({
-    control: studentForm.control,
-    name: "status",
+  const selectedProgramId = useWatch({
+    control: courseForm.control,
+    name: "program_id",
   });
 
   const setupQuery = useApiQuery({
@@ -115,9 +139,9 @@ export default function SetupPage() {
           apiRequest<ApiResponse<Program[]>>(`/program/${campus.id}`)
         )
       );
-      const programs = programResults.flatMap((res) => {
+      const programs = programResults.flatMap((res, index) => {
         if (res.status !== "fulfilled") return [];
-        return extractData(res.value);
+        return extractPrograms(res.value, campuses[index]);
       });
 
       const [courseRes, studentRes] = await Promise.allSettled([
@@ -139,9 +163,15 @@ export default function SetupPage() {
   });
 
   const campuses = setupQuery.data?.campuses ?? [];
-  const programs = setupQuery.data?.programs ?? [];
+  const programs = Array.from(
+    new Map((setupQuery.data?.programs ?? []).map((program) => [program.id, program])).values()
+  );
   const courses = setupQuery.data?.courses ?? [];
   const students = setupQuery.data?.students ?? [];
+  const selectedCampusName =
+    campuses.find((campus) => campus.id === selectedCampusId)?.name ?? "";
+  const selectedProgramName =
+    programs.find((program) => program.id === selectedProgramId)?.name ?? "";
 
   const createCampus = async (values: { name: string; description: string }) => {
     const res = await apiRequest<ApiMessage>("/campus", {
@@ -163,7 +193,7 @@ export default function SetupPage() {
       method: "POST",
       body: values,
     });
-    showToast({ title: res.message ?? "Programa criado", variant: "success" });
+    showToast({ title: res.message ?? "Curso criado", variant: "success" });
     programForm.reset({ ...values, name: "", description: "" });
     await setupQuery.refetch();
   };
@@ -171,6 +201,7 @@ export default function SetupPage() {
   const createCourse = async (values: {
     name: string;
     description: string;
+    program_id: string;
     year: number;
     semester: number;
   }) => {
@@ -185,31 +216,17 @@ export default function SetupPage() {
 
   const createStudent = async (values: {
     studentId: string;
-    name?: string;
-    email?: string;
-    phone?: string;
-    annotation?: string;
-    status: StudentStatus;
   }) => {
     const payload = {
-      ...values,
-      name: values.name || undefined,
-      email: values.email || undefined,
-      phone: values.phone || undefined,
-      annotation: values.annotation || undefined,
+      studentId: values.studentId,
     };
     const res = await apiRequest<ApiMessage>("/student/create", {
       method: "POST",
       body: payload,
     });
-    showToast({ title: res.message ?? "Aluno criado", variant: "success" });
+    showToast({ title: res.message ?? "Aluno pre-cadastrado", variant: "success" });
     studentForm.reset({
-      ...values,
       studentId: "",
-      name: "",
-      email: "",
-      phone: "",
-      annotation: "",
     });
     await setupQuery.refetch();
   };
@@ -286,7 +303,7 @@ export default function SetupPage() {
                 <CardHeader className="border-b border-border/60 px-6 py-6">
                   <CardTitle className="text-lg">Cadastro de campus</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Comece por aqui. Os programas dependem de ao menos um campus.
+                    Comece por aqui. Os cursos dependem de ao menos um campus.
                   </p>
                 </CardHeader>
                 <CardContent className="px-6 py-6">
@@ -321,15 +338,15 @@ export default function SetupPage() {
             <TabsContent value="program">
               <Card className="rounded-3xl border border-border/60 bg-white/90 py-0">
                 <CardHeader className="border-b border-border/60 px-6 py-6">
-                  <CardTitle className="text-lg">Cadastro de programa</CardTitle>
+                  <CardTitle className="text-lg">Cadastro de curso</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Vincule cada programa ao campus correto para manter a base organizada.
+                    Vincule cada curso ao campus correto para manter a base organizada.
                   </p>
                 </CardHeader>
                 <CardContent className="px-6 py-6">
                   {!campuses.length ? (
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      Cadastre ao menos um campus antes de criar programas.
+                      Cadastre ao menos um campus antes de criar cursos.
                     </div>
                   ) : null}
                   <form
@@ -345,7 +362,9 @@ export default function SetupPage() {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione um campus" />
+                          <SelectValue placeholder="Selecione um campus">
+                            {selectedCampusName}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {campuses.map((campus) => (
@@ -357,7 +376,7 @@ export default function SetupPage() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="program-name">Nome</Label>
+                      <Label htmlFor="program-name">Nome do curso</Label>
                       <Input id="program-name" {...programForm.register("name")} />
                     </div>
                     <div className="space-y-2">
@@ -373,7 +392,7 @@ export default function SetupPage() {
                         disabled={!campuses.length}
                         className={cn(buttonVariants({ variant: "default", size: "lg" }))}
                       >
-                        Salvar programa
+                        Salvar curso
                       </button>
                     </div>
                   </form>
@@ -386,14 +405,41 @@ export default function SetupPage() {
                 <CardHeader className="border-b border-border/60 px-6 py-6">
                   <CardTitle className="text-lg">Cadastro de disciplina</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Cadastre as disciplinas ativas para uso em convites e importacao de alunos.
+                    Vincule cada disciplina a um curso antes de usar convites e importacao de alunos.
                   </p>
                 </CardHeader>
                 <CardContent className="px-6 py-6">
+                  {!programs.length ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      Cadastre ao menos um curso antes de criar disciplinas.
+                    </div>
+                  ) : null}
                   <form
-                    className="flex flex-col gap-4"
+                    className="mt-4 flex flex-col gap-4"
                     onSubmit={courseForm.handleSubmit(createCourse)}
                   >
+                    <div className="space-y-2">
+                      <Label>Curso</Label>
+                      <Select
+                        value={selectedProgramId}
+                        onValueChange={(value) =>
+                          courseForm.setValue("program_id", value ?? "")
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um curso">
+                            {selectedProgramName}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {programs.map((program) => (
+                            <SelectItem key={program.id} value={program.id}>
+                              {program.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="course-name">Nome</Label>
                       <Input id="course-name" {...courseForm.register("name")} />
@@ -426,6 +472,7 @@ export default function SetupPage() {
                     <div className="flex justify-end">
                       <button
                         type="submit"
+                        disabled={!programs.length}
                         className={cn(buttonVariants({ variant: "default", size: "lg" }))}
                       >
                         Salvar disciplina
@@ -441,13 +488,13 @@ export default function SetupPage() {
                 <CardHeader className="border-b border-border/60 px-6 py-6">
                   <CardTitle className="text-lg">Pre-cadastro de aluno</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Para volume maior, prefira a tela de alunos com importacao por CSV.
+                    Aqui o professor informa apenas a matricula. O restante dos dados vem depois, quando o aluno finaliza o cadastro via convite.
                   </p>
                 </CardHeader>
                 <CardContent className="px-6 py-6">
                   <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
                     <p className="text-sm text-muted-foreground">
-                      Cadastros pontuais funcionam melhor aqui. Importacoes em lote ficam em uma tela dedicada.
+                      O aluno entra como pendente. Para turmas maiores, use a importacao por CSV na tela de alunos.
                     </p>
                     <Link
                       href="/students"
@@ -460,54 +507,9 @@ export default function SetupPage() {
                     className="flex flex-col gap-4"
                     onSubmit={studentForm.handleSubmit(createStudent)}
                   >
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="student-id">Matricula</Label>
-                        <Input id="student-id" {...studentForm.register("studentId")} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Status</Label>
-                        <Select
-                          value={selectedStudentStatus}
-                          onValueChange={(value) =>
-                            studentForm.setValue("status", value as StudentStatus)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statusOptions.map((status) => (
-                              <SelectItem key={status} value={status}>
-                                {status}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
                     <div className="space-y-2">
-                      <Label htmlFor="student-name">Nome</Label>
-                      <Input id="student-name" {...studentForm.register("name")} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="student-email">Email</Label>
-                      <Input
-                        id="student-email"
-                        type="email"
-                        {...studentForm.register("email")}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="student-phone">Telefone</Label>
-                      <Input id="student-phone" {...studentForm.register("phone")} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="student-annotation">Observacao</Label>
-                      <Textarea
-                        id="student-annotation"
-                        {...studentForm.register("annotation")}
-                      />
+                      <Label htmlFor="student-id">Matricula</Label>
+                      <Input id="student-id" {...studentForm.register("studentId")} />
                     </div>
                     <div className="flex justify-end">
                       <button
@@ -537,7 +539,7 @@ export default function SetupPage() {
                 </div>
                 <div className="rounded-2xl border border-border/60 bg-background px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                    Programas
+                    Cursos
                   </p>
                   <p className="mt-1 text-2xl font-semibold">{programs.length}</p>
                 </div>
@@ -562,8 +564,8 @@ export default function SetupPage() {
               </CardHeader>
               <CardContent className="px-6 py-5">
                 <div className="space-y-3 text-sm text-muted-foreground">
-                  <p>1. Cadastre campus para destravar programas.</p>
-                  <p>2. Crie programas e depois as disciplinas ativas.</p>
+                  <p>1. Cadastre campus para destravar cursos.</p>
+                  <p>2. Crie cursos e depois as disciplinas ativas.</p>
                   <p>3. Use alunos apenas para casos pontuais ou revise a tela dedicada.</p>
                 </div>
               </CardContent>
@@ -597,7 +599,7 @@ export default function SetupPage() {
                       ))
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        Nenhum programa cadastrado ainda.
+                        Nenhum curso cadastrado ainda.
                       </p>
                     ))}
 
