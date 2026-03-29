@@ -99,8 +99,8 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-8">
       <PageHeader
         title={`Ola, ${userName}`}
-        description="Acompanhe o resumo das suas entidades e prossimos passos para manter as comunicacoes em dia."
-        badge="Visao geral"
+        description="Acompanhe quantas turmas ja estao estruturadas, quantas matriculas aguardam auto-cadastro e o que falta para iniciar os disparos."
+        badge="Comunicacao da turma"
       />
       <ToastOnError error={summaryQuery.error} />
 
@@ -118,16 +118,16 @@ export default function DashboardPage() {
           <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
             <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
               <h2 className="text-lg font-semibold text-foreground">
-                Proximas etapas sugeridas
+                Fluxo sugerido
               </h2>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {[
-                  "Cadastre ou atualize o campus",
-                  "Crie os cursos ativos",
-                  "Configure as disciplinas",
-                  "Importe o CSV de alunos",
-                  "Ative SMTP e WhatsApp",
-                  "Envie o primeiro comunicado",
+                  "Estruture campus, curso e disciplina",
+                  "Registre as matriculas esperadas",
+                  "Gere o convite da disciplina",
+                  "Projete o link ou QR code em sala",
+                  "Aguarde os alunos completarem email e telefone",
+                  "Ative SMTP e WhatsApp para disparo em massa",
                 ].map((item) => (
                   <div
                     key={item}
@@ -141,7 +141,7 @@ export default function DashboardPage() {
 
             <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
               <h2 className="text-lg font-semibold text-foreground">
-                Status dos alunos
+                Estado da base de contatos
               </h2>
               <div className="mt-4 flex flex-wrap gap-2">
                 {[
@@ -167,6 +167,9 @@ export default function DashboardPage() {
                   </Badge>
                 ))}
               </div>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Pendentes ainda nao concluíram o auto-cadastro. Ativos ja podem receber mensagens pelos canais configurados.
+              </p>
             </Card>
           </section>
         </>

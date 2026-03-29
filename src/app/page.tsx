@@ -14,12 +14,12 @@ export default function Home() {
               Unicast Frontend
             </p>
             <h1 className="text-4xl font-semibold leading-tight text-foreground md:text-5xl">
-              Centralize a comunicacao com alunos e campanhas em um unico painel.
+              Colete contatos da turma sem planilha improvisada.
             </h1>
             <p className="max-w-xl text-base text-muted-foreground md:text-lg">
-              Crie campi, cursos e alunos, conecte SMTP e WhatsApp, envie mensagens
-              e acompanhe o status das turmas. Um fluxo simples, com tudo que o
-              backend do Unicast oferece.
+              O professor registra as matriculas esperadas, compartilha um convite
+              por link ou QR code em sala e deixa o proprio aluno completar email e
+              telefone. Depois disso, o envio por WhatsApp e email fica centralizado.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link
@@ -38,17 +38,17 @@ export default function Home() {
                 href="/student/register/demo"
                 className={cn(buttonVariants({ size: "lg", variant: "outline" }))}
               >
-                Registro do aluno
+                Ver tela do aluno
               </Link>
             </div>
           </div>
           <Card className="flex flex-col gap-6 rounded-3xl border border-border/60 bg-white/80 p-6 shadow-lg">
             <div>
               <p className="text-sm font-medium text-foreground">
-                Fluxo rapido para o docente
+                Fluxo real de uso
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Configure o basico, importe o CSV e envie mensagens em minutos.
+                A jornada foi pensada para sala de aula, convite projetado e cadastro pelo proprio aluno.
               </p>
             </div>
             <div className="space-y-3">
@@ -56,10 +56,13 @@ export default function Home() {
                 1. Cadastre campus, curso e disciplina.
               </div>
               <div className="rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm">
-                2. Importe alunos ou crie convites.
+                2. Registre as matriculas ou importe a turma por CSV.
               </div>
               <div className="rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm">
-                3. Conecte SMTP/WhatsApp e dispare a campanha.
+                3. Gere o convite, compartilhe em sala e receba os contatos preenchidos pelos alunos.
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm">
+                4. Conecte SMTP/WhatsApp e envie comunicados em massa.
               </div>
             </div>
           </Card>

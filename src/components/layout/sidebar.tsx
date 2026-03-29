@@ -13,8 +13,8 @@ import {
 
 const navItems = [
   { href: "/dashboard", label: "Painel", icon: LayoutDashboard },
-  { href: "/setup", label: "Cadastro base", icon: ClipboardList },
-  { href: "/students", label: "Alunos", icon: UserPlus },
+  { href: "/setup", label: "Estrutura e turma", icon: ClipboardList },
+  { href: "/students", label: "Matriculas", icon: UserPlus },
   { href: "/messages", label: "Mensagens", icon: MessageSquare },
   { href: "/integrations", label: "Integracoes", icon: PlugZap },
   { href: "/invites", label: "Convites", icon: BookOpen },
@@ -55,7 +55,7 @@ export const Sidebar = () => {
       </nav>
       <div className="rounded-2xl border border-sidebar-border bg-white/70 p-4 text-xs text-muted-foreground shadow-sm">
         <p className="font-medium text-sidebar-foreground">Atalhos</p>
-        <p className="mt-2">Use o painel para criar campi, cursos e convites.</p>
+        <p className="mt-2">Estruture a disciplina, registre matriculas e compartilhe o convite com a turma.</p>
       </div>
     </aside>
   );

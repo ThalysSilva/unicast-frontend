@@ -207,6 +207,10 @@ export const apiRequest = async <T>(
     throw new ApiError(response.status, extractErrorMessage(payload));
   }
 
+  if (payload === null || typeof payload === "undefined") {
+    return {} as T;
+  }
+
   return payload as T;
 };
 

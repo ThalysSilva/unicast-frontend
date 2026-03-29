@@ -30,7 +30,6 @@ import type {
   Campus,
   Course,
   Program,
-  Student,
 } from "@/lib/types";
 
 const isProgramLike = (value: unknown): value is Program => {
@@ -79,12 +78,12 @@ const setupSections = [
   {
     value: "course",
     label: "Disciplina",
-    description: "Cadastre as disciplinas ativas por periodo.",
+    description: "Crie a disciplina que vai receber matriculas e convite.",
   },
   {
-    value: "student",
-    label: "Aluno",
-    description: "Use para pre-cadastros pontuais.",
+    value: "roster",
+    label: "Turma",
+    description: "Matriculas entram vinculadas a disciplina, nao soltas.",
   },
 ] as const;
 
@@ -113,12 +112,6 @@ export default function SetupPage() {
       semester: 1,
     },
   });
-  const studentForm = useForm({
-    defaultValues: {
-      studentId: "",
-    },
-  });
-
   const selectedCampusId = useWatch({
     control: programForm.control,
     name: "campus_id",
@@ -146,7 +139,7 @@ export default function SetupPage() {
 
       const [courseRes, studentRes] = await Promise.allSettled([
         apiRequest<ApiResponse<Course[]>>("/course/any"),
-        apiRequest<ApiResponse<Student[]>>("/student"),
+        apiRequest<ApiResponse<never[]>>("/student"),
       ]);
 
       return {
@@ -167,7 +160,6 @@ export default function SetupPage() {
     new Map((setupQuery.data?.programs ?? []).map((program) => [program.id, program])).values()
   );
   const courses = setupQuery.data?.courses ?? [];
-  const students = setupQuery.data?.students ?? [];
   const selectedCampusName =
     campuses.find((campus) => campus.id === selectedCampusId)?.name ?? "";
   const selectedProgramName =
@@ -214,36 +206,19 @@ export default function SetupPage() {
     await setupQuery.refetch();
   };
 
-  const createStudent = async (values: {
-    studentId: string;
-  }) => {
-    const payload = {
-      studentId: values.studentId,
-    };
-    const res = await apiRequest<ApiMessage>("/student/create", {
-      method: "POST",
-      body: payload,
-    });
-    showToast({ title: res.message ?? "Aluno pre-cadastrado", variant: "success" });
-    studentForm.reset({
-      studentId: "",
-    });
-    await setupQuery.refetch();
-  };
-
   const summary = {
     campus: campuses.length,
     program: programs.length,
     course: courses.length,
-    student: students.length,
+    roster: courses.length,
   };
 
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Estrutura academica"
-        description="Configure a base em etapas. Escolha o que deseja gerenciar agora e edite uma entidade por vez."
-        badge="Setup guiado"
+        title="Estrutura da turma"
+        description="Monte a base da disciplina, registre as matriculas que voce ja conhece e prepare o caminho para os alunos completarem email e telefone por conta propria."
+        badge="Fluxo docente"
       />
       <ToastOnError error={setupQuery.error} />
 
@@ -303,7 +278,7 @@ export default function SetupPage() {
                 <CardHeader className="border-b border-border/60 px-6 py-6">
                   <CardTitle className="text-lg">Cadastro de campus</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Comece por aqui. Os cursos dependem de ao menos um campus.
+                    Comece pela estrutura institucional. Os cursos dependem de ao menos um campus.
                   </p>
                 </CardHeader>
                 <CardContent className="px-6 py-6">
@@ -340,7 +315,7 @@ export default function SetupPage() {
                 <CardHeader className="border-b border-border/60 px-6 py-6">
                   <CardTitle className="text-lg">Cadastro de curso</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Vincule cada curso ao campus correto para manter a base organizada.
+                    O curso organiza as disciplinas que vao receber matriculas e convites.
                   </p>
                 </CardHeader>
                 <CardContent className="px-6 py-6">
@@ -405,7 +380,7 @@ export default function SetupPage() {
                 <CardHeader className="border-b border-border/60 px-6 py-6">
                   <CardTitle className="text-lg">Cadastro de disciplina</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Vincule cada disciplina a um curso antes de usar convites e importacao de alunos.
+                    A disciplina e a unidade pratica do fluxo: e nela que voce importa matriculas, gera convite e acompanha o cadastro da turma.
                   </p>
                 </CardHeader>
                 <CardContent className="px-6 py-6">
@@ -483,43 +458,39 @@ export default function SetupPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="student">
+            <TabsContent value="roster">
               <Card className="rounded-3xl border border-border/60 bg-white/90 py-0">
                 <CardHeader className="border-b border-border/60 px-6 py-6">
-                  <CardTitle className="text-lg">Pre-cadastro de aluno</CardTitle>
+                  <CardTitle className="text-lg">Vinculo da turma</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Aqui o professor informa apenas a matricula. O restante dos dados vem depois, quando o aluno finaliza o cadastro via convite.
+                    A matricula precisa entrar vinculada a uma disciplina para o convite funcionar. O backend valida enrollment antes do auto-cadastro.
                   </p>
                 </CardHeader>
                 <CardContent className="px-6 py-6">
-                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
-                    <p className="text-sm text-muted-foreground">
-                      O aluno entra como pendente. Para turmas maiores, use a importacao por CSV na tela de alunos.
-                    </p>
-                    <Link
-                      href="/students"
-                      className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                    >
-                      Abrir alunos
-                    </Link>
-                  </div>
-                  <form
-                    className="flex flex-col gap-4"
-                    onSubmit={studentForm.handleSubmit(createStudent)}
-                  >
-                    <div className="space-y-2">
-                      <Label htmlFor="student-id">Matricula</Label>
-                      <Input id="student-id" {...studentForm.register("studentId")} />
+                  <div className="grid gap-4">
+                    <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-4">
+                      <p className="text-sm text-muted-foreground">
+                        Use a tela de matriculas para importar ou registrar alunos dentro de uma disciplina especifica. Assim o sistema cria ou reaproveita o aluno e garante o vinculo necessario para o convite.
+                      </p>
                     </div>
-                    <div className="flex justify-end">
-                      <button
-                        type="submit"
+                    <div className="rounded-2xl border border-border/60 bg-background px-4 py-4 text-sm text-muted-foreground">
+                      Fluxo correto: disciplina, matriculas, convite, auto-cadastro e mensagens.
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <Link
+                        href="/students"
                         className={cn(buttonVariants({ variant: "default", size: "lg" }))}
                       >
-                        Salvar aluno
-                      </button>
+                        Abrir matriculas
+                      </Link>
+                      <Link
+                        href="/invites"
+                        className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
+                      >
+                        Abrir convites
+                      </Link>
                     </div>
-                  </form>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -551,9 +522,9 @@ export default function SetupPage() {
                 </div>
                 <div className="rounded-2xl border border-border/60 bg-background px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                    Alunos
+                    Disciplinas com turma
                   </p>
-                  <p className="mt-1 text-2xl font-semibold">{students.length}</p>
+                  <p className="mt-1 text-2xl font-semibold">{courses.length}</p>
                 </div>
               </CardContent>
             </Card>
@@ -564,9 +535,9 @@ export default function SetupPage() {
               </CardHeader>
               <CardContent className="px-6 py-5">
                 <div className="space-y-3 text-sm text-muted-foreground">
-                  <p>1. Cadastre campus para destravar cursos.</p>
-                  <p>2. Crie cursos e depois as disciplinas ativas.</p>
-                  <p>3. Use alunos apenas para casos pontuais ou revise a tela dedicada.</p>
+                  <p>1. Estruture campus, curso e disciplina.</p>
+                  <p>2. Registre matriculas dentro da disciplina pela tela dedicada.</p>
+                  <p>3. Gere o convite da disciplina e compartilhe o link com a turma.</p>
                 </div>
               </CardContent>
             </Card>
@@ -616,16 +587,16 @@ export default function SetupPage() {
                       </p>
                     ))}
 
-                  {activeSection === "student" &&
-                    (students.length ? (
-                      students.slice(0, 10).map((student) => (
-                        <Badge key={student.id} variant="outline">
-                          {student.studentId}
+                  {activeSection === "roster" &&
+                    (courses.length ? (
+                      courses.slice(0, 10).map((course) => (
+                        <Badge key={course.id} variant="outline">
+                          {course.name}
                         </Badge>
                       ))
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        Nenhum aluno cadastrado ainda.
+                        Nenhuma disciplina pronta para receber matriculas ainda.
                       </p>
                     ))}
                 </div>

@@ -23,6 +23,7 @@ import type { ApiResponse, Course } from "@/lib/types";
 export default function InvitesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [invite, setInvite] = useState<string | null>(null);
+  const [origin, setOrigin] = useState("");
   const { showToast } = useToast();
 
   const form = useForm({
@@ -31,6 +32,7 @@ export default function InvitesPage() {
   const courseId = useWatch({ control: form.control, name: "courseId" });
 
   useEffect(() => {
+    setOrigin(window.location.origin);
     const load = async () => {
       const coursesRes = await apiRequest<ApiResponse<Course[]>>("/course/any");
       setCourses(extractData(coursesRes));
@@ -62,17 +64,28 @@ export default function InvitesPage() {
     showToast({ title: "Convite criado com sucesso", variant: "success" });
   };
 
+  const inviteLink = invite ? `${origin}/student/register/${invite}` : "";
+
+  const copyInviteLink = async () => {
+    if (!inviteLink) return;
+    await navigator.clipboard.writeText(inviteLink);
+    showToast({ title: "Link copiado", variant: "success" });
+  };
+
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
         title="Convites"
-        description="Gere links para os alunos se cadastrarem no curso informado."
-        badge="Auto-registro"
+        description="Gere o link da disciplina para projetar em sala, colar no mural ou compartilhar com a turma. E o aluno completa o cadastro sozinho."
+        badge="Link da turma"
       />
 
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-          <h2 className="text-lg font-semibold">Criar convite</h2>
+          <h2 className="text-lg font-semibold">Criar convite da disciplina</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            O convite serve para o aluno informar matricula, nome, email e telefone sem o professor precisar coletar isso manualmente.
+          </p>
           <form
             className="mt-4 flex flex-col gap-4"
             onSubmit={form.handleSubmit(createInvite)}
@@ -108,20 +121,29 @@ export default function InvitesPage() {
         </Card>
 
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-          <h2 className="text-lg font-semibold">Compartilhar</h2>
+          <h2 className="text-lg font-semibold">Compartilhar com a turma</h2>
           {invite ? (
             <div className="mt-4 space-y-3">
               <Badge variant="outline">Codigo: {invite}</Badge>
-              <p className="text-sm text-muted-foreground">
-                Link:
-                <span className="ml-2 font-medium text-foreground">
-                  /student/register/{invite}
-                </span>
-              </p>
+              <div className="rounded-2xl border border-border/60 bg-background px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Link de auto-cadastro
+                </p>
+                <p className="mt-2 break-all text-sm font-medium text-foreground">
+                  {inviteLink || `/student/register/${invite}`}
+                </p>
+              </div>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>Use esse link no quadro, no slide da aula ou em um QR code externo.</p>
+                <p>O aluno acessa, informa a matricula e completa os dados de contato.</p>
+              </div>
+              <Button variant="outline" onClick={copyInviteLink}>
+                Copiar link
+              </Button>
             </div>
           ) : (
             <p className="mt-4 text-sm text-muted-foreground">
-              Crie um convite para visualizar o link de cadastro.
+              Gere um convite para visualizar o link que sera compartilhado com a turma.
             </p>
           )}
         </Card>

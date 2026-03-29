@@ -55,6 +55,8 @@ export default function StudentsPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StudentStatus | "ALL">("ALL");
   const [courseId, setCourseId] = useState("");
+  const [singleCourseId, setSingleCourseId] = useState("");
+  const [singleStudentId, setSingleStudentId] = useState("");
   const [importMode, setImportMode] = useState("upsert");
   const [file, setFile] = useState<File | null>(null);
   const { showToast } = useToast();
@@ -97,6 +99,25 @@ export default function StudentsPage() {
     },
   });
 
+  const addStudentToCourseMutation = useApiMutation<
+    ApiMessage,
+    { courseId: string; studentId: string }
+  >({
+    mutationFn: async ({ courseId, studentId }) =>
+      apiRequest<ApiMessage>(`/course/${courseId}/students`, {
+        method: "POST",
+        body: { studentId },
+      }),
+    invalidateQueryKeys: [queryKeys.students()],
+    onSuccess: (res) => {
+      showToast({
+        title: res.message ?? "Matrícula vinculada com sucesso",
+        variant: "success",
+      });
+      setSingleStudentId("");
+    },
+  });
+
   const students = studentsQuery.data ?? EMPTY_STUDENTS;
   const courses = coursesQuery.data ?? EMPTY_COURSES;
   const isLoading = studentsQuery.isLoading || coursesQuery.isLoading;
@@ -124,18 +145,33 @@ export default function StudentsPage() {
     await importStudentsMutation.mutateAsync(formData);
   };
 
+  const handleSingleAdd = async () => {
+    if (!singleCourseId || !singleStudentId.trim()) {
+      showToast({
+        title: "Selecione a disciplina e informe a matrícula",
+        variant: "error",
+      });
+      return;
+    }
+
+    await addStudentToCourseMutation.mutateAsync({
+      courseId: singleCourseId,
+      studentId: singleStudentId.trim(),
+    });
+  };
+
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Alunos"
-        description="Importe CSV, filtre status e acompanhe a situacao de cada aluno vinculado."
-        badge="Gestao de turma"
+        title="Matriculas e contatos"
+        description="Acompanhe quem ja concluiu o auto-cadastro, filtre pendencias e importe matriculas em lote por disciplina."
+        badge="Base de alunos"
       />
       <ToastOnError error={studentsQuery.error ?? coursesQuery.error} />
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-          <h2 className="text-lg font-semibold">Lista inteligente</h2>
+          <h2 className="text-lg font-semibold">Base da turma</h2>
           <div className="mt-4 flex flex-wrap gap-3">
             <Input
               placeholder="Buscar por nome, email ou matricula"
@@ -216,71 +252,121 @@ export default function StudentsPage() {
             ) : (
               <EmptyState
                 title="Nenhum aluno encontrado"
-                description="Ajuste os filtros ou importe um CSV para popular a lista."
+                description="Ajuste os filtros ou importe matriculas para iniciar o fluxo de auto-cadastro."
                 className="rounded-none border-0"
               />
             )}
           </div>
         </Card>
 
-        <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-          <h2 className="text-lg font-semibold">Importar CSV</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Envie um CSV com studentId,name,phone,email,status.
-          </p>
-          <div className="mt-4 flex flex-col gap-4">
-            <div className="space-y-2">
-              <Label>Disciplina</Label>
-              <Select
-                value={courseId}
-                onValueChange={(value) => setCourseId(value ?? "")}
+        <div className="grid gap-6">
+          <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
+            <h2 className="text-lg font-semibold">Adicionar matrícula</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Use este formulário quando entrar um aluno novo depois da importação inicial. O sistema cria ou reaproveita a matrícula e faz o vínculo com a disciplina.
+            </p>
+            <div className="mt-4 flex flex-col gap-4">
+              <div className="space-y-2">
+                <Label>Disciplina</Label>
+                <Select
+                  value={singleCourseId}
+                  onValueChange={(value) => setSingleCourseId(value ?? "")}
+                >
+                  <SelectTrigger disabled={coursesQuery.isLoading}>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {courses.map((course) => (
+                      <SelectItem key={course.id} value={course.id}>
+                        {course.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="single-student-id">Matrícula</Label>
+                <Input
+                  id="single-student-id"
+                  value={singleStudentId}
+                  disabled={addStudentToCourseMutation.isPending}
+                  onChange={(event) => setSingleStudentId(event.target.value)}
+                />
+              </div>
+              <Button
+                onClick={handleSingleAdd}
+                disabled={
+                  !singleCourseId ||
+                  !singleStudentId.trim() ||
+                  addStudentToCourseMutation.isPending
+                }
               >
-                <SelectTrigger disabled={coursesQuery.isLoading}>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {courses.map((course) => (
-                    <SelectItem key={course.id} value={course.id}>
-                      {course.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {addStudentToCourseMutation.isPending
+                  ? "Vinculando..."
+                  : "Adicionar à disciplina"}
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label>Modo de importacao</Label>
-              <Select
-                value={importMode}
-                onValueChange={(value) => setImportMode(value ?? "upsert")}
+          </Card>
+
+          <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
+            <h2 className="text-lg font-semibold">Importar matriculas</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Envie um CSV com `studentId` obrigatorio para carga inicial ou atualizações maiores da turma.
+            </p>
+            <div className="mt-4 flex flex-col gap-4">
+              <div className="space-y-2">
+                <Label>Disciplina</Label>
+                <Select
+                  value={courseId}
+                  onValueChange={(value) => setCourseId(value ?? "")}
+                >
+                  <SelectTrigger disabled={coursesQuery.isLoading}>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {courses.map((course) => (
+                      <SelectItem key={course.id} value={course.id}>
+                        {course.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Modo de importacao</Label>
+                <Select
+                  value={importMode}
+                  onValueChange={(value) => setImportMode(value ?? "upsert")}
+                >
+                  <SelectTrigger disabled={importStudentsMutation.isPending}>
+                    <SelectValue placeholder="Modo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="upsert">Atualizar ou inserir</SelectItem>
+                    <SelectItem value="clean">Substituir lista</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Arquivo CSV</Label>
+                <Input
+                  type="file"
+                  accept=".csv"
+                  disabled={importStudentsMutation.isPending}
+                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                />
+              </div>
+              <Button
+                onClick={handleImport}
+                disabled={!file || !courseId || importStudentsMutation.isPending}
               >
-                <SelectTrigger disabled={importStudentsMutation.isPending}>
-                  <SelectValue placeholder="Modo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="upsert">Atualizar ou inserir</SelectItem>
-                  <SelectItem value="clean">Substituir lista</SelectItem>
-                </SelectContent>
-              </Select>
+                {importStudentsMutation.isPending
+                  ? "Importando..."
+                  : "Importar matriculas"}
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label>Arquivo CSV</Label>
-              <Input
-                type="file"
-                accept=".csv"
-                disabled={importStudentsMutation.isPending}
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              />
-            </div>
-            <Button
-              onClick={handleImport}
-              disabled={!file || !courseId || importStudentsMutation.isPending}
-            >
-              {importStudentsMutation.isPending
-                ? "Importando..."
-                : "Importar alunos"}
-            </Button>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </section>
     </div>
   );

@@ -58,10 +58,10 @@ export default function StudentRegisterPage() {
             Auto-registro
           </p>
           <h1 className="text-3xl font-semibold text-foreground">
-            Cadastro do aluno
+            Complete seu cadastro
           </h1>
           <p className="text-sm text-muted-foreground">
-            Preencha os dados abaixo para confirmar sua inscricao.
+            Se sua matricula ja foi registrada pelo professor, preencha os dados abaixo para liberar os comunicados por email e WhatsApp.
           </p>
         </div>
         <form
@@ -84,7 +84,7 @@ export default function StudentRegisterPage() {
             <Label htmlFor="phone">Telefone</Label>
             <Input id="phone" {...form.register("phone")} />
           </div>
-          <Button type="submit">Finalizar cadastro</Button>
+          <Button type="submit">Ativar meus contatos</Button>
         </form>
       </Card>
     </div>
