@@ -10,6 +10,14 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
@@ -46,6 +54,7 @@ const statusOrder: StudentStatus[] = [
 ];
 
 const EMPTY_STUDENTS: Student[] = [];
+type StudentStatusFilter = "ALL" | StudentStatus;
 
 const toStudentArray = (value: unknown): Student[] =>
   Array.isArray(value) ? value : [];
@@ -54,6 +63,8 @@ export default function CourseDetailPage() {
   const params = useParams<{ id: string }>();
   const courseId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [origin, setOrigin] = useState("");
+  const [studentStatusFilter, setStudentStatusFilter] =
+    useState<StudentStatusFilter>("ALL");
   const { showToast } = useToast();
 
   const structureQuery = useApiQuery({
@@ -139,6 +150,22 @@ export default function CourseDetailPage() {
     status,
     count: students.filter((student) => student.status === status).length,
   }));
+  const statusFilters: Array<{
+    status: StudentStatusFilter;
+    label: string;
+    count: number;
+  }> = [
+    { status: "ALL", label: "Todos", count: students.length },
+    ...statusStats.map((item) => ({
+      status: item.status,
+      label: studentStatusLabel(item.status),
+      count: item.count,
+    })),
+  ];
+  const filteredStudents =
+    studentStatusFilter === "ALL"
+      ? students
+      : students.filter((student) => student.status === studentStatusFilter);
 
   const activeStudents = students.filter(
     (student) => student.status === "ACTIVE"
@@ -172,7 +199,7 @@ export default function CourseDetailPage() {
 
   if (!course) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-5">
         <PageHeader
           title="Disciplina nao encontrada"
           description="Volte para a estrutura academica e selecione uma disciplina cadastrada."
@@ -188,14 +215,101 @@ export default function CourseDetailPage() {
     );
   }
 
+  const inviteHistoryDialog = (
+    <Dialog>
+      <DialogTrigger
+        render={
+          <button
+            type="button"
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+          />
+        }
+      >
+        Exibir todos convites
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Todos convites gerados</DialogTitle>
+          <DialogDescription>
+            Histórico de links criados para esta disciplina.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-1">
+          {invites.length ? (
+            invites.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-2xl border border-border/60 bg-background px-4 py-3"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-foreground">{item.code}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatInviteExpiration(item.expiresAt)}
+                    </p>
+                  </div>
+                  <Badge variant="outline">{inviteStatusLabel(item)}</Badge>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <InviteQrDialog
+                    code={item.code}
+                    link={buildInviteLink(item.code)}
+                    campusName={course.campusName}
+                    courseName={course.name}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copyInviteCode(item.code)}
+                    className={cn(
+                      buttonVariants({
+                        variant: "ghost",
+                        size: "sm",
+                      })
+                    )}
+                  >
+                    Copiar link
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      deleteInviteMutation.isPending &&
+                      deleteInviteMutation.variables === item.id
+                    }
+                    onClick={() => deleteInviteMutation.mutate(item.id)}
+                    className={cn(
+                      buttonVariants({
+                        variant: "destructive",
+                        size: "sm",
+                      })
+                    )}
+                  >
+                    {deleteInviteMutation.isPending &&
+                    deleteInviteMutation.variables === item.id
+                      ? "Removendo..."
+                      : "Remover"}
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Nenhum link foi gerado para esta disciplina ainda.
+            </p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-5">
       <PageHeader
         title={course.name}
-        description={`${course.campusName} / ${course.programName} / ${course.year}.${course.semester}`}
+        description={`Disciplina cadastrada para o periodo ${course.year}.${course.semester}.`}
         badge="Disciplina"
       />
       <AcademicBreadcrumb
+        className="py-2"
         items={[
           { label: "Estrutura", href: "/setup" },
           { label: course.campusName, href: `/campuses/${course.campusId}` },
@@ -205,37 +319,43 @@ export default function CourseDetailPage() {
       />
       <ToastOnError error={queryError} />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="rounded-2xl border border-border/60 bg-white/90 p-5">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Card className="rounded-2xl border border-border/60 bg-white/90 px-4 py-3">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Matriculas
           </p>
-          <p className="mt-2 text-3xl font-semibold">{students.length}</p>
+          <p className="mt-0.5 text-2xl font-semibold leading-none">
+            {students.length}
+          </p>
         </Card>
-        <Card className="rounded-2xl border border-border/60 bg-white/90 p-5">
+        <Card className="rounded-2xl border border-border/60 bg-white/90 px-4 py-3">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Ativos
           </p>
-          <p className="mt-2 text-3xl font-semibold">{activeStudents}</p>
+          <p className="mt-0.5 text-2xl font-semibold leading-none">
+            {activeStudents}
+          </p>
         </Card>
-        <Card className="rounded-2xl border border-border/60 bg-white/90 p-5">
+        <Card className="rounded-2xl border border-border/60 bg-white/90 px-4 py-3">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Pendentes
           </p>
-          <p className="mt-2 text-3xl font-semibold">{pendingStudents}</p>
+          <p className="mt-0.5 text-2xl font-semibold leading-none">
+            {pendingStudents}
+          </p>
         </Card>
-        <Card className="rounded-2xl border border-border/60 bg-white/90 p-5">
+        <Card className="rounded-2xl border border-border/60 bg-white/90 px-4 py-3">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Convite
           </p>
-          <p className="mt-2 text-lg font-semibold">
+          <p className="mt-0.5 text-base font-semibold leading-none">
             {invite?.code ? invite.code : "Nao gerado"}
           </p>
         </Card>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
-        <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
+      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+        <Card className="rounded-3xl border border-border/60 bg-white/90 p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">Turma da disciplina</h2>
@@ -251,8 +371,40 @@ export default function CourseDetailPage() {
             </Link>
           </div>
 
-          <div className="mt-5 overflow-hidden rounded-2xl border border-border/60">
-            {students.length ? (
+          <div className="mt-4 grid grid-cols-3 gap-1.5 lg:grid-cols-6">
+            {statusFilters.map((item) => {
+              const isSelected = studentStatusFilter === item.status;
+
+              return (
+                <button
+                  key={item.status}
+                  type="button"
+                  onClick={() => setStudentStatusFilter(item.status)}
+                  className={cn(
+                    "flex min-h-8 items-center justify-between gap-1 rounded-lg border px-2 py-1 text-left transition",
+                    isSelected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border/60 bg-background hover:border-primary/50"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "text-[11px] leading-none",
+                      isSelected
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {item.label}
+                  </span>
+                  <span className="text-sm font-semibold">{item.count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 max-h-[360px] overflow-auto rounded-2xl border border-border/60">
+            {filteredStudents.length ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -262,7 +414,7 @@ export default function CourseDetailPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {students.map((student) => (
+                  {filteredStudents.map((student) => (
                     <TableRow key={student.id}>
                       <TableCell>
                         <p className="font-medium text-foreground">
@@ -289,33 +441,48 @@ export default function CourseDetailPage() {
               </Table>
             ) : (
               <EmptyState
-                title="Nenhuma matricula vinculada"
-                description="Importe ou adicione matriculas para esta disciplina antes de compartilhar o convite."
+                title={
+                  students.length
+                    ? "Nenhuma matricula nesse filtro"
+                    : "Nenhuma matricula vinculada"
+                }
+                description={
+                  students.length
+                    ? "Selecione outro status para ver os alunos dessa turma."
+                    : "Importe ou adicione matriculas para esta disciplina antes de compartilhar o convite."
+                }
                 className="rounded-none border-0"
               />
             )}
           </div>
         </Card>
 
-        <aside className="grid gap-6">
-          <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-            <h2 className="text-lg font-semibold">Estado da turma</h2>
-            <div className="mt-4 grid gap-3">
-              {statusStats.map((item) => (
-                <div
-                  key={item.status}
-                  className="flex items-center justify-between rounded-2xl border border-border/60 bg-background px-4 py-3"
-                >
-                  <span className="text-sm text-muted-foreground">
-                    {studentStatusLabel(item.status)}
-                  </span>
-                  <span className="font-semibold">{item.count}</span>
-                </div>
-              ))}
+        <aside className="grid gap-5">
+          <Card className="rounded-3xl border border-border/60 bg-white/90 p-5">
+            <h2 className="text-lg font-semibold">Acoes</h2>
+            <div className="mt-4 flex flex-col gap-3">
+              <Link
+                href="/students"
+                className={cn(buttonVariants({ variant: "default", size: "lg" }))}
+              >
+                Importar ou adicionar matriculas
+              </Link>
+              <Link
+                href="/messages"
+                className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
+              >
+                Enviar mensagem
+              </Link>
+              <Link
+                href={`/programs/${course.programId}`}
+                className={cn(buttonVariants({ variant: "ghost", size: "lg" }))}
+              >
+                Voltar para o curso
+              </Link>
             </div>
           </Card>
 
-          <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
+          <Card className="rounded-3xl border border-border/60 bg-white/90 p-5">
             <h2 className="text-lg font-semibold">Ultimo convite gerado</h2>
             {invite?.code ? (
               <div className="mt-4 grid gap-3">
@@ -344,6 +511,7 @@ export default function CourseDetailPage() {
                   >
                     Copiar link
                   </button>
+                  {inviteHistoryDialog}
                 </div>
               </div>
             ) : (
@@ -359,101 +527,9 @@ export default function CourseDetailPage() {
                 >
                   Criar convite
                 </Link>
+                {inviteHistoryDialog}
               </div>
             )}
-          </Card>
-
-          <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-            <h2 className="text-lg font-semibold">Links gerados</h2>
-            <div className="mt-4 grid gap-3">
-              {invites.length ? (
-                invites.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl border border-border/60 bg-background px-4 py-3"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {item.code}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {formatInviteExpiration(item.expiresAt)}
-                        </p>
-                      </div>
-                      <Badge variant="outline">{inviteStatusLabel(item)}</Badge>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <InviteQrDialog
-                        code={item.code}
-                        link={buildInviteLink(item.code)}
-                        campusName={course.campusName}
-                        courseName={course.name}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => copyInviteCode(item.code)}
-                        className={cn(
-                          buttonVariants({
-                            variant: "ghost",
-                            size: "sm",
-                          })
-                        )}
-                      >
-                        Copiar link
-                      </button>
-                      <button
-                        type="button"
-                        disabled={
-                          deleteInviteMutation.isPending &&
-                          deleteInviteMutation.variables === item.id
-                        }
-                        onClick={() => deleteInviteMutation.mutate(item.id)}
-                        className={cn(
-                          buttonVariants({
-                            variant: "destructive",
-                            size: "sm",
-                          })
-                        )}
-                      >
-                        {deleteInviteMutation.isPending &&
-                        deleteInviteMutation.variables === item.id
-                          ? "Removendo..."
-                          : "Remover"}
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nenhum link foi gerado para esta disciplina ainda.
-                </p>
-              )}
-            </div>
-          </Card>
-
-          <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-            <h2 className="text-lg font-semibold">Acoes</h2>
-            <div className="mt-4 flex flex-col gap-3">
-              <Link
-                href="/students"
-                className={cn(buttonVariants({ variant: "default", size: "lg" }))}
-              >
-                Importar ou adicionar matriculas
-              </Link>
-              <Link
-                href="/messages"
-                className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
-              >
-                Enviar mensagem
-              </Link>
-              <Link
-                href={`/programs/${course.programId}`}
-                className={cn(buttonVariants({ variant: "ghost", size: "lg" }))}
-              >
-                Voltar para o curso
-              </Link>
-            </div>
           </Card>
         </aside>
       </section>

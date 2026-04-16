@@ -362,7 +362,7 @@ export default function InvitesPage() {
           ) : null}
         </div>
 
-        <div className="mt-5 grid gap-3">
+        <div className="mt-5 grid max-h-[560px] gap-3 overflow-y-auto pr-1">
           {!courseId ? (
             <p className="rounded-2xl border border-border/60 bg-background px-5 py-4 text-sm text-muted-foreground">
               Selecione uma disciplina para ver os links ja gerados.

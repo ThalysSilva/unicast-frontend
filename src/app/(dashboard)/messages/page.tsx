@@ -173,7 +173,7 @@ export default function MessagesPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             Marque quem deve receber a mensagem. O envio usa os IDs dos alunos.
           </p>
-          <div className="mt-4 grid gap-3">
+          <div className="mt-4 grid max-h-[560px] gap-3 overflow-y-auto pr-1">
             {isLoading ? (
               <LoadingState label="Carregando alunos e integracoes..." />
             ) : students.length ? (

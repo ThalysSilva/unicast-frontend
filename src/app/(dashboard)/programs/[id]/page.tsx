@@ -82,7 +82,7 @@ export default function ProgramDetailPage() {
 
   if (!program) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-5">
         <PageHeader
           title="Curso nao encontrado"
           description="Volte para a estrutura academica e selecione um curso cadastrado."
@@ -194,7 +194,7 @@ export default function ProgramDetailPage() {
             </Link>
           </div>
 
-          <div className="mt-5 grid gap-3">
+          <div className="mt-5 grid max-h-[560px] gap-3 overflow-y-auto pr-1">
             {courses.length ? (
               courses.map((course) => (
                 <Link

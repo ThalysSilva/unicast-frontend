@@ -202,7 +202,7 @@ export default function StudentsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="mt-4 overflow-hidden rounded-2xl border border-border/60">
+          <div className="mt-4 max-h-[540px] overflow-auto rounded-2xl border border-border/60">
             {isLoading ? (
               <LoadingState
                 label="Carregando alunos e disciplinas..."

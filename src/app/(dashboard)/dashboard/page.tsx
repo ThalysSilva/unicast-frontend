@@ -225,7 +225,7 @@ export default function DashboardPage() {
                 </TabsList>
 
                 <TabsContent value="courses">
-                  <div className="overflow-hidden rounded-2xl border border-border/60">
+                  <div className="max-h-[440px] overflow-auto rounded-2xl border border-border/60">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -282,7 +282,7 @@ export default function DashboardPage() {
                 </TabsContent>
 
                 <TabsContent value="programs">
-                  <div className="overflow-hidden rounded-2xl border border-border/60">
+                  <div className="max-h-[440px] overflow-auto rounded-2xl border border-border/60">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -337,7 +337,7 @@ export default function DashboardPage() {
                 </TabsContent>
 
                 <TabsContent value="campuses">
-                  <div className="overflow-hidden rounded-2xl border border-border/60">
+                  <div className="max-h-[440px] overflow-auto rounded-2xl border border-border/60">
                     <Table>
                       <TableHeader>
                         <TableRow>

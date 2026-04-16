@@ -437,7 +437,7 @@ export default function IntegrationsPage() {
             {smtpQuery.isLoading ? (
               <LoadingState label="Carregando SMTP..." className="min-h-24" />
             ) : smtp.length ? (
-              <div className="grid gap-3">
+              <div className="grid max-h-[360px] gap-3 overflow-y-auto pr-1">
                 {smtp.map((item) => (
                   <div
                     key={item.id}
@@ -499,7 +499,7 @@ export default function IntegrationsPage() {
               {createWhatsappMutation.isPending ? "Criando..." : "Criar instancia"}
             </Button>
           </form>
-          <div className="mt-4 overflow-hidden rounded-2xl border border-border/60">
+          <div className="mt-4 max-h-[420px] overflow-auto rounded-2xl border border-border/60">
             {isLoading ? (
               <LoadingState
                 label="Carregando instancias do WhatsApp..."

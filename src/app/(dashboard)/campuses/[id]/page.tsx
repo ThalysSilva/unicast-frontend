@@ -76,7 +76,7 @@ export default function CampusDetailPage() {
 
   if (!campus) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-5">
         <PageHeader
           title="Campus nao encontrado"
           description="Volte para a estrutura academica e selecione um campus cadastrado."
@@ -171,7 +171,7 @@ export default function CampusDetailPage() {
             </Link>
           </div>
 
-          <div className="mt-5 grid gap-3">
+          <div className="mt-5 grid max-h-[560px] gap-3 overflow-y-auto pr-1">
             {programs.length ? (
               programs.map((program) => {
                 const programCourses = courses.filter(

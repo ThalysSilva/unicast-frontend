@@ -118,7 +118,7 @@ export default function SetupPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3">
+          <div className="mt-5 grid max-h-[560px] gap-3 overflow-y-auto pr-1">
             {structureQuery.isLoading ? (
               <LoadingState label="Carregando campus..." />
             ) : campuses.length ? (
@@ -168,4 +168,3 @@ export default function SetupPage() {
     </div>
   );
 }
-
