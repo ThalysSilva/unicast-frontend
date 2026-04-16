@@ -73,7 +73,7 @@ export default function StudentsPage() {
   const coursesQuery = useApiQuery({
     queryKey: queryKeys.courses(),
     queryFn: async () => {
-      const response = await apiRequest<ApiResponse<Course[]>>("/course/any");
+      const response = await apiRequest<ApiResponse<Course[]>>("/course");
       return extractData(response);
     },
   });

@@ -117,7 +117,7 @@ export default function InvitesPage() {
   useEffect(() => {
     setOrigin(window.location.origin);
     const load = async () => {
-      const coursesRes = await apiRequest<ApiResponse<Course[]>>("/course/any");
+      const coursesRes = await apiRequest<ApiResponse<Course[]>>("/course");
       setCourses(extractData(coursesRes));
     };
     load();

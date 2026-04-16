@@ -75,7 +75,7 @@ export default function DashboardPage() {
       });
 
       const [courseRes, studentRes] = await Promise.all([
-        apiRequest<ApiResponse<Course[]>>("/course/any"),
+        apiRequest<ApiResponse<Course[]>>("/course"),
         apiRequest<ApiResponse<Student[]>>("/student"),
       ]);
 

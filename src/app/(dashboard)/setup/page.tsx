@@ -139,7 +139,7 @@ export default function SetupPage() {
       });
 
       const [courseRes, studentRes] = await Promise.allSettled([
-        apiRequest<ApiResponse<Course[]>>("/course/any"),
+        apiRequest<ApiResponse<Course[]>>("/course"),
         apiRequest<ApiResponse<never[]>>("/student"),
       ]);
 
