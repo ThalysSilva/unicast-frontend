@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { InviteQrDialog } from "@/components/invites/invite-qr-dialog";
 import { AcademicBreadcrumb } from "@/components/layout/academic-breadcrumb";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -152,11 +153,12 @@ export default function CourseDetailPage() {
     showToast({ title: "Link copiado", variant: "success" });
   };
   const copyInviteCode = async (code: string) => {
-    const link =
-      origin && code ? `${origin}/student/register/${code}` : `/student/register/${code}`;
+    const link = buildInviteLink(code);
     await navigator.clipboard.writeText(link);
     showToast({ title: "Link copiado", variant: "success" });
   };
+  const buildInviteLink = (code: string) =>
+    origin && code ? `${origin}/student/register/${code}` : `/student/register/${code}`;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -374,6 +376,10 @@ export default function CourseDetailPage() {
                       <Badge variant="outline">{inviteStatusLabel(item)}</Badge>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
+                      <InviteQrDialog
+                        code={item.code}
+                        link={buildInviteLink(item.code)}
+                      />
                       <button
                         type="button"
                         onClick={() => copyInviteCode(item.code)}

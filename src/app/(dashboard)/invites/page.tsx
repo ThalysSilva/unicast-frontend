@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
+import { InviteQrDialog } from "@/components/invites/invite-qr-dialog";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -209,11 +210,12 @@ export default function InvitesPage() {
     showToast({ title: "Link copiado", variant: "success" });
   };
   const copyInviteCode = async (code: string) => {
-    const link =
-      origin && code ? `${origin}/student/register/${code}` : `/student/register/${code}`;
+    const link = buildInviteLink(code);
     await navigator.clipboard.writeText(link);
     showToast({ title: "Link copiado", variant: "success" });
   };
+  const buildInviteLink = (code: string) =>
+    origin && code ? `${origin}/student/register/${code}` : `/student/register/${code}`;
 
   return (
     <div className="flex flex-col gap-8">
@@ -375,6 +377,10 @@ export default function InvitesPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline">{inviteStatusLabel(item)}</Badge>
+                    <InviteQrDialog
+                      code={item.code}
+                      link={buildInviteLink(item.code)}
+                    />
                     <Button
                       type="button"
                       variant="ghost"
