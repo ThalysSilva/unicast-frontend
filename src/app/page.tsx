@@ -62,7 +62,7 @@ export default function Home() {
                 3. Gere o convite, compartilhe em sala e receba os contatos preenchidos pelos alunos.
               </div>
               <div className="rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm">
-                4. Conecte SMTP/WhatsApp e envie comunicados em massa.
+                4. Conecte Email/WhatsApp e envie comunicados em massa.
               </div>
             </div>
           </Card>

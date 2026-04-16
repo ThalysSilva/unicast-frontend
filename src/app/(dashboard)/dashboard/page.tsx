@@ -146,7 +146,7 @@ export default function DashboardPage() {
                   "Gere o convite da disciplina",
                   "Projete o link ou QR code em sala",
                   "Aguarde os alunos completarem email e telefone",
-                  "Ative SMTP e WhatsApp para disparo em massa",
+                  "Ative Email e WhatsApp para disparo em massa",
                 ].map((item) => (
                   <div
                     key={item}

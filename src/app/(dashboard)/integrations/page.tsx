@@ -177,7 +177,7 @@ export default function IntegrationsPage() {
     },
     invalidateQueryKeys: [queryKeys.smtp()],
     onSuccess: (res) => {
-      handleSuccess(res.message ?? "SMTP criado");
+      handleSuccess(res.message ?? "Email conectado");
       smtpForm.reset();
     },
   });
@@ -197,7 +197,7 @@ export default function IntegrationsPage() {
         body: values,
       }),
     onSuccess: (res) => {
-      handleSuccess(res.message ?? "Conexao SMTP validada");
+      handleSuccess(res.message ?? "Conexao de email validada");
     },
   });
 
@@ -220,7 +220,7 @@ export default function IntegrationsPage() {
       }),
     invalidateQueryKeys: [queryKeys.smtp()],
     onSuccess: (res) => {
-      handleSuccess(res.message ?? "SMTP removido");
+      handleSuccess(res.message ?? "Email removido");
     },
   });
 
@@ -308,7 +308,7 @@ export default function IntegrationsPage() {
       <PageHeader
         title="Integracoes"
         description="Conecte seus canais de envio para liberar comunicados via email e WhatsApp."
-        badge="SMTP + WhatsApp"
+        badge="Email + WhatsApp"
       />
 
       <ToastOnError error={queryError} />
@@ -352,13 +352,13 @@ export default function IntegrationsPage() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-          <h2 className="text-lg font-semibold">SMTP</h2>
+          <h2 className="text-lg font-semibold">Email</h2>
           <div className="mt-4 rounded-2xl border border-border/60 bg-background p-4">
             <p className="text-sm font-medium text-foreground">
               Conectar email pessoal com OAuth
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Use esta opcao para conectar uma conta Gmail sem depender de senha SMTP.
+              Use esta opcao para conectar uma conta Gmail sem depender de senha de aplicativo.
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
               <Button
@@ -426,16 +426,16 @@ export default function IntegrationsPage() {
                   testSmtpMutation.mutateAsync(values)
                 )}
               >
-                {testSmtpMutation.isPending ? "Testando..." : "Testar SMTP"}
+                {testSmtpMutation.isPending ? "Testando..." : "Testar email"}
               </Button>
               <Button type="submit" disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}>
-                {createSmtpMutation.isPending ? "Salvando..." : "Salvar SMTP"}
+                {createSmtpMutation.isPending ? "Salvando..." : "Salvar email"}
               </Button>
             </div>
           </form>
           <div className="mt-4">
             {smtpQuery.isLoading ? (
-              <LoadingState label="Carregando SMTP..." className="min-h-24" />
+              <LoadingState label="Carregando emails..." className="min-h-24" />
             ) : smtp.length ? (
               <div className="grid max-h-[360px] gap-3 overflow-y-auto pr-1">
                 {smtp.map((item) => (
@@ -452,7 +452,7 @@ export default function IntegrationsPage() {
                       </p>
                     </div>
                     <Badge variant="outline">
-                      {item.authMode === "oauth" ? "OAuth" : "SMTP"}
+                      {item.authMode === "oauth" ? "OAuth" : "Senha"}
                     </Badge>
                     <Button
                       size="sm"
@@ -470,7 +470,7 @@ export default function IntegrationsPage() {
               </div>
             ) : (
               <EmptyState
-                title="Nenhum SMTP cadastrado"
+                title="Nenhum email cadastrado"
                 description="Cadastre uma credencial para liberar envios por email."
               />
             )}
