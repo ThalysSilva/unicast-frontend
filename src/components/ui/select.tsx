@@ -8,6 +8,11 @@ import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
 const Select = SelectPrimitive.Root
 
+type SelectValueOption = {
+  label: React.ReactNode
+  value: string
+}
+
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
     <SelectPrimitive.Group
@@ -25,6 +30,24 @@ function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
       className={cn("flex flex-1 text-left", className)}
       {...props}
     />
+  )
+}
+
+function SelectValueFromOptions({
+  className,
+  options,
+  value,
+  ...props
+}: Omit<SelectPrimitive.Value.Props, "children"> & {
+  options: SelectValueOption[]
+  value?: string | null
+}) {
+  const selected = options.find((option) => option.value === value)
+
+  return (
+    <SelectValue className={className} {...props}>
+      {selected?.label}
+    </SelectValue>
   )
 }
 
@@ -198,4 +221,5 @@ export {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
+  SelectValueFromOptions,
 }

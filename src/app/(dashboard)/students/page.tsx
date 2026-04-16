@@ -16,6 +16,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectValueFromOptions,
 } from "@/components/ui/select";
 import {
   Table,
@@ -121,6 +122,10 @@ export default function StudentsPage() {
   const students = studentsQuery.data ?? EMPTY_STUDENTS;
   const courses = coursesQuery.data ?? EMPTY_COURSES;
   const isLoading = studentsQuery.isLoading || coursesQuery.isLoading;
+  const courseOptions = courses.map((course) => ({
+    value: course.id,
+    label: course.name,
+  }));
 
   const filtered = useMemo(() => {
     return students.filter((student) => {
@@ -273,7 +278,11 @@ export default function StudentsPage() {
                   onValueChange={(value) => setSingleCourseId(value ?? "")}
                 >
                   <SelectTrigger disabled={coursesQuery.isLoading}>
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValueFromOptions
+                      placeholder="Selecione"
+                      options={courseOptions}
+                      value={singleCourseId}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {courses.map((course) => (
@@ -321,7 +330,11 @@ export default function StudentsPage() {
                   onValueChange={(value) => setCourseId(value ?? "")}
                 >
                   <SelectTrigger disabled={coursesQuery.isLoading}>
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValueFromOptions
+                      placeholder="Selecione"
+                      options={courseOptions}
+                      value={courseId}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {courses.map((course) => (

@@ -55,6 +55,9 @@ export type SmtpInstance = {
   host: string;
   port: number;
   email: string;
+  authMode?: string;
+  provider?: string;
+  tokenExpiresAt?: string;
 };
 
 export type WhatsappInstance = {

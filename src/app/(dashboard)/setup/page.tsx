@@ -17,6 +17,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectValueFromOptions,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -160,10 +161,14 @@ export default function SetupPage() {
     new Map((setupQuery.data?.programs ?? []).map((program) => [program.id, program])).values()
   );
   const courses = setupQuery.data?.courses ?? [];
-  const selectedCampusName =
-    campuses.find((campus) => campus.id === selectedCampusId)?.name ?? "";
-  const selectedProgramName =
-    programs.find((program) => program.id === selectedProgramId)?.name ?? "";
+  const campusOptions = campuses.map((campus) => ({
+    value: campus.id,
+    label: campus.name,
+  }));
+  const programOptions = programs.map((program) => ({
+    value: program.id,
+    label: program.name,
+  }));
 
   const createCampus = async (values: { name: string; description: string }) => {
     const res = await apiRequest<ApiMessage>("/campus", {
@@ -337,9 +342,11 @@ export default function SetupPage() {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione um campus">
-                            {selectedCampusName}
-                          </SelectValue>
+                          <SelectValueFromOptions
+                            placeholder="Selecione um campus"
+                            options={campusOptions}
+                            value={selectedCampusId}
+                          />
                         </SelectTrigger>
                         <SelectContent>
                           {campuses.map((campus) => (
@@ -402,9 +409,11 @@ export default function SetupPage() {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione um curso">
-                            {selectedProgramName}
-                          </SelectValue>
+                          <SelectValueFromOptions
+                            placeholder="Selecione um curso"
+                            options={programOptions}
+                            value={selectedProgramId}
+                          />
                         </SelectTrigger>
                         <SelectContent>
                           {programs.map((program) => (

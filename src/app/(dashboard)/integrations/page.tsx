@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -55,6 +55,8 @@ type CreateWhatsappResponse = {
   pairingCode?: string;
 };
 
+type OAuthStartResponse = ApiResponse<{ url: string }>;
+
 const CONNECTED_STATUSES = new Set(["open", "connected"]);
 
 export default function IntegrationsPage() {
@@ -62,6 +64,31 @@ export default function IntegrationsPage() {
   const [qrOpen, setQrOpen] = useState(false);
   const [qrInstanceId, setQrInstanceId] = useState<string | null>(null);
   const { showToast } = useToast();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("oauth_status");
+    if (!status) return;
+
+    const provider = params.get("oauth_provider");
+    const message = params.get("oauth_message");
+    showToast({
+      title:
+        status === "success"
+          ? "Google conectado com sucesso"
+          : message ?? "Falha ao conectar provedor de email",
+      variant: status === "success" ? "success" : "error",
+    });
+
+    params.delete("oauth_status");
+    params.delete("oauth_provider");
+    params.delete("oauth_message");
+    const nextQuery = params.toString();
+    const nextURL = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`;
+    window.history.replaceState({}, "", nextURL);
+  }, [showToast]);
 
   const smtpForm = useForm({
     defaultValues: {
@@ -152,6 +179,37 @@ export default function IntegrationsPage() {
     onSuccess: (res) => {
       handleSuccess(res.message ?? "SMTP criado");
       smtpForm.reset();
+    },
+  });
+
+  const testSmtpMutation = useApiMutation<
+    ApiMessage,
+    {
+      host: string;
+      port: number;
+      email: string;
+      password: string;
+    }
+  >({
+    mutationFn: async (values) =>
+      apiRequest<ApiMessage>("/smtp/instance/test", {
+        method: "POST",
+        body: values,
+      }),
+    onSuccess: (res) => {
+      handleSuccess(res.message ?? "Conexao SMTP validada");
+    },
+  });
+
+  const startOAuthMutation = useApiMutation<OAuthStartResponse, "google">({
+    mutationFn: async (provider) =>
+      apiRequest<OAuthStartResponse>(`/smtp/oauth/${provider}/start`, {
+        method: "POST",
+      }),
+    onSuccess: (res) => {
+      if (typeof window !== "undefined" && res.data?.url) {
+        window.location.href = res.data.url;
+      }
     },
   });
 
@@ -295,6 +353,27 @@ export default function IntegrationsPage() {
       <section className="grid gap-6 lg:grid-cols-2">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
           <h2 className="text-lg font-semibold">SMTP</h2>
+          <div className="mt-4 rounded-2xl border border-border/60 bg-background p-4">
+            <p className="text-sm font-medium text-foreground">
+              Conectar email pessoal com OAuth
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use esta opcao para conectar uma conta Gmail sem depender de senha SMTP.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={startOAuthMutation.isPending}
+                onClick={() => startOAuthMutation.mutate("google")}
+              >
+                {startOAuthMutation.isPending &&
+                startOAuthMutation.variables === "google"
+                  ? "Conectando..."
+                  : "Conectar Google"}
+              </Button>
+            </div>
+          </div>
           <form
             className="mt-4 flex flex-col gap-4"
             onSubmit={smtpForm.handleSubmit((values) =>
@@ -306,7 +385,7 @@ export default function IntegrationsPage() {
                 <Label htmlFor="smtp-host">Host</Label>
                 <Input
                   id="smtp-host"
-                  disabled={createSmtpMutation.isPending}
+                  disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
                   {...smtpForm.register("host")}
                 />
               </div>
@@ -315,32 +394,44 @@ export default function IntegrationsPage() {
                 <Input
                   id="smtp-port"
                   type="number"
-                  disabled={createSmtpMutation.isPending}
+                  disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
                   {...smtpForm.register("port", { valueAsNumber: true })}
                 />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="smtp-email">Email</Label>
-              <Input
-                id="smtp-email"
-                type="email"
-                disabled={createSmtpMutation.isPending}
-                {...smtpForm.register("email")}
-              />
-            </div>
+                <Input
+                  id="smtp-email"
+                  type="email"
+                  disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
+                  {...smtpForm.register("email")}
+                />
+              </div>
             <div className="space-y-2">
               <Label htmlFor="smtp-pass">Senha</Label>
-              <Input
-                id="smtp-pass"
-                type="password"
-                disabled={createSmtpMutation.isPending}
-                {...smtpForm.register("password")}
-              />
+                <Input
+                  id="smtp-pass"
+                  type="password"
+                  disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
+                  {...smtpForm.register("password")}
+                />
+              </div>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
+                onClick={smtpForm.handleSubmit((values) =>
+                  testSmtpMutation.mutateAsync(values)
+                )}
+              >
+                {testSmtpMutation.isPending ? "Testando..." : "Testar SMTP"}
+              </Button>
+              <Button type="submit" disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}>
+                {createSmtpMutation.isPending ? "Salvando..." : "Salvar SMTP"}
+              </Button>
             </div>
-            <Button type="submit" disabled={createSmtpMutation.isPending}>
-              {createSmtpMutation.isPending ? "Salvando..." : "Salvar SMTP"}
-            </Button>
           </form>
           <div className="mt-4">
             {smtpQuery.isLoading ? (
@@ -355,9 +446,14 @@ export default function IntegrationsPage() {
                     <div className="min-w-0">
                       <p className="font-medium text-foreground">{item.email}</p>
                       <p className="text-xs text-muted-foreground">
-                        {item.host}:{item.port}
+                        {item.authMode === "oauth"
+                          ? "Google OAuth"
+                          : `${item.host}:${item.port}`}
                       </p>
                     </div>
+                    <Badge variant="outline">
+                      {item.authMode === "oauth" ? "OAuth" : "SMTP"}
+                    </Badge>
                     <Button
                       size="sm"
                       variant="destructive"

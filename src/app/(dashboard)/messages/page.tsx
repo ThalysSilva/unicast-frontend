@@ -18,6 +18,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectValueFromOptions,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
@@ -44,7 +45,6 @@ export default function MessagesPage() {
 
   const form = useForm({
     defaultValues: {
-      from: "",
       subject: "",
       body: "",
       smtp_id: "",
@@ -83,7 +83,6 @@ export default function MessagesPage() {
   const sendMessageMutation = useApiMutation<
     ApiMessage,
     {
-      from: string;
       subject: string;
       body: string;
       smtp_id: string;
@@ -128,9 +127,16 @@ export default function MessagesPage() {
   );
   const smtpId = useWatch({ control: form.control, name: "smtp_id" });
   const whatsappId = useWatch({ control: form.control, name: "whatsapp_id" });
+  const smtpOptions = smtp.map((item) => ({
+    value: item.id,
+    label: item.email,
+  }));
+  const whatsappOptions = whatsapp.map((item) => ({
+    value: item.id,
+    label: item.instanceName ?? item.phone,
+  }));
 
   const handleSend = async (values: {
-    from: string;
     subject: string;
     body: string;
     smtp_id: string;
@@ -138,6 +144,14 @@ export default function MessagesPage() {
   }) => {
     if (!validSelected.length) {
       showToast({ title: "Selecione ao menos um aluno", variant: "error" });
+      return;
+    }
+
+    if (!values.smtp_id && !values.whatsapp_id) {
+      showToast({
+        title: "Selecione ao menos um canal de envio",
+        variant: "error",
+      });
       return;
     }
 
@@ -213,7 +227,11 @@ export default function MessagesPage() {
                   }
                 >
                   <SelectTrigger disabled={isLoading || sendMessageMutation.isPending}>
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValueFromOptions
+                      placeholder="Selecione"
+                      options={smtpOptions}
+                      value={smtpId}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {smtp.map((item) => (
@@ -233,7 +251,11 @@ export default function MessagesPage() {
                   }
                 >
                   <SelectTrigger disabled={isLoading || sendMessageMutation.isPending}>
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValueFromOptions
+                      placeholder="Selecione"
+                      options={whatsappOptions}
+                      value={whatsappId}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {whatsapp.map((item) => (
@@ -244,14 +266,6 @@ export default function MessagesPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="msg-from">Remetente</Label>
-              <Input
-                id="msg-from"
-                disabled={sendMessageMutation.isPending}
-                {...form.register("from")}
-              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="msg-subject">Assunto</Label>

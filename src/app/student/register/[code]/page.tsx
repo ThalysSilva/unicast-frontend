@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
@@ -22,6 +23,7 @@ export default function StudentRegisterPage() {
       name: "",
       email: "",
       phone: "",
+      consent: false,
     },
   });
 
@@ -30,6 +32,7 @@ export default function StudentRegisterPage() {
     name?: string;
     email?: string;
     phone?: string;
+    consent: boolean;
   }) => {
     try {
       const res = await apiRequest<ApiMessage>(
@@ -83,6 +86,23 @@ export default function StudentRegisterPage() {
           <div className="space-y-2">
             <Label htmlFor="phone">Telefone</Label>
             <Input id="phone" {...form.register("phone")} />
+          </div>
+          <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+            <label className="flex items-start gap-3 text-sm text-muted-foreground">
+              <Checkbox
+                checked={form.watch("consent")}
+                onCheckedChange={(checked) =>
+                  form.setValue("consent", checked === true, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                className="mt-0.5"
+              />
+              <span>
+                Aceito receber comunicados automatizados desta disciplina por email e WhatsApp para fins acadêmicos.
+              </span>
+            </label>
           </div>
           <Button type="submit">Ativar meus contatos</Button>
         </form>

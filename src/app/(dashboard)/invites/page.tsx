@@ -14,11 +14,67 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
+  SelectValueFromOptions,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast-provider";
-import { apiRequest, extractData } from "@/lib/api";
+import { ApiError, apiRequest, extractData } from "@/lib/api";
 import type { ApiResponse, Course } from "@/lib/types";
+
+const toDateTimeLocalValue = (date: Date) => {
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60_000);
+  return localDate.toISOString().slice(0, 16);
+};
+
+const buildEndOfDay = (daysFromNow: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromNow);
+  date.setHours(23, 59, 0, 0);
+  return toDateTimeLocalValue(date);
+};
+
+const extractInviteCode = (payload: unknown) => {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const payloadRecord = payload as Record<string, unknown>;
+
+  const nestedData =
+    "data" in payloadRecord &&
+    payloadRecord.data &&
+    typeof payloadRecord.data === "object"
+      ? (payloadRecord.data as Record<string, unknown>)
+      : null;
+
+  if (nestedData?.code && typeof nestedData.code === "string") {
+    return nestedData.code;
+  }
+
+  if ("code" in payloadRecord && typeof payloadRecord.code === "string") {
+    return payloadRecord.code;
+  }
+
+  const fallbackNested = nestedData
+    ? Object.values(nestedData).find((value) => typeof value === "string")
+    : null;
+  if (typeof fallbackNested === "string") {
+    return fallbackNested;
+  }
+
+  const fallbackTopLevel = Object.values(payloadRecord).find(
+    (value) => typeof value === "string" && value !== payloadRecord.message
+  );
+  return typeof fallbackTopLevel === "string" ? fallbackTopLevel : null;
+};
+
+type InvitePayload = {
+  id: string;
+  courseId: string;
+  code: string;
+  expiresAt?: string | null;
+  active: boolean;
+};
 
 export default function InvitesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -30,6 +86,33 @@ export default function InvitesPage() {
     defaultValues: { courseId: "", expiresAt: "" },
   });
   const courseId = useWatch({ control: form.control, name: "courseId" });
+  const courseOptions = courses.map((course) => ({
+    value: course.id,
+    label: course.name,
+  }));
+
+  const loadCurrentInvite = async (selectedCourseId: string) => {
+    if (!selectedCourseId) {
+      setInvite(null);
+      return null;
+    }
+
+    try {
+      const inviteRes = await apiRequest<ApiResponse<InvitePayload | null>>(
+        `/invite/${selectedCourseId}/current`
+      );
+      const currentInvite = extractData(inviteRes);
+      const currentCode = currentInvite?.code ?? null;
+      setInvite(currentCode);
+      return currentCode;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        setInvite(null);
+        return null;
+      }
+      throw error;
+    }
+  };
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -40,6 +123,15 @@ export default function InvitesPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    loadCurrentInvite(courseId).catch(() => {
+      showToast({
+        title: "Nao foi possivel carregar o convite atual da disciplina.",
+        variant: "error",
+      });
+    });
+  }, [courseId, showToast]);
+
   const createInvite = async (values: {
     courseId: string;
     expiresAt?: string;
@@ -49,18 +141,29 @@ export default function InvitesPage() {
       return;
     }
     const payload = values.expiresAt
-      ? { expiresAt: values.expiresAt }
+      ? { expiresAt: new Date(values.expiresAt).toISOString() }
       : undefined;
 
-    const res = await apiRequest<ApiResponse<Record<string, string>>>(
+    const res = await apiRequest<ApiResponse<Record<string, string>> | Record<string, string>>(
       `/invite/${values.courseId}`,
       {
         method: "POST",
         body: payload,
       }
     );
-    const code = res.data?.code ?? Object.values(res.data ?? {})[0];
-    setInvite(code ?? null);
+    const code = extractInviteCode(res);
+    if (code) {
+      setInvite(code);
+    }
+
+    const currentCode = await loadCurrentInvite(values.courseId);
+    if (!currentCode && !code) {
+      showToast({
+        title: "O convite foi criado, mas o codigo nao voltou na resposta.",
+        variant: "error",
+      });
+      return;
+    }
     showToast({ title: "Convite criado com sucesso", variant: "success" });
   };
 
@@ -97,7 +200,11 @@ export default function InvitesPage() {
                 onValueChange={(value) => form.setValue("courseId", value ?? "")}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
+                  <SelectValueFromOptions
+                    placeholder="Selecione"
+                    options={courseOptions}
+                    value={courseId}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {courses.map((course) => (
@@ -109,12 +216,49 @@ export default function InvitesPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="invite-exp">Expira em (ISO)</Label>
+              <Label htmlFor="invite-exp">Expira em</Label>
               <Input
                 id="invite-exp"
-                placeholder="2025-01-31T23:59:00Z"
+                type="datetime-local"
                 {...form.register("expiresAt")}
               />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => form.setValue("expiresAt", buildEndOfDay(0))}
+                >
+                  Hoje, 23:59
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => form.setValue("expiresAt", buildEndOfDay(1))}
+                >
+                  Amanhã, 23:59
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => form.setValue("expiresAt", buildEndOfDay(7))}
+                >
+                  7 dias
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => form.setValue("expiresAt", "")}
+                >
+                  Sem expiração
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                O horário é preenchido no seu fuso local e convertido automaticamente para o formato aceito pelo backend.
+              </p>
             </div>
             <Button type="submit">Gerar convite</Button>
           </form>
