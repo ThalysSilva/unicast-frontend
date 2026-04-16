@@ -16,12 +16,37 @@ import {
 type InviteQrDialogProps = {
   code: string;
   link: string;
+  campusName?: string;
+  courseName?: string;
 };
 
-const buildFileName = (code: string) =>
-  `convite-${code.toLowerCase().replace(/[^a-z0-9_-]/g, "-")}.png`;
+const slugify = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
-export function InviteQrDialog({ code, link }: InviteQrDialogProps) {
+const buildFileName = ({
+  code,
+  campusName,
+  courseName,
+}: {
+  code: string;
+  campusName?: string;
+  courseName?: string;
+}) => {
+  const parts = ["convite", campusName, courseName, code].filter(Boolean);
+  return `${parts.map((part) => slugify(part ?? "")).join("-")}.png`;
+};
+
+export function InviteQrDialog({
+  code,
+  link,
+  campusName,
+  courseName,
+}: InviteQrDialogProps) {
   const [open, setOpen] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState("");
 
@@ -44,7 +69,7 @@ export function InviteQrDialog({ code, link }: InviteQrDialogProps) {
 
     const anchor = document.createElement("a");
     anchor.href = qrDataUrl;
-    anchor.download = buildFileName(code);
+    anchor.download = buildFileName({ code, campusName, courseName });
     anchor.click();
   };
 
@@ -94,4 +119,3 @@ export function InviteQrDialog({ code, link }: InviteQrDialogProps) {
     </Dialog>
   );
 }
-

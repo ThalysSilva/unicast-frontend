@@ -316,7 +316,7 @@ export default function CourseDetailPage() {
           </Card>
 
           <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-            <h2 className="text-lg font-semibold">Convite da disciplina</h2>
+            <h2 className="text-lg font-semibold">Ultimo convite gerado</h2>
             {invite?.code ? (
               <div className="mt-4 grid gap-3">
                 <Badge variant="outline">Codigo: {invite.code}</Badge>
@@ -328,15 +328,23 @@ export default function CourseDetailPage() {
                     {inviteLink || `/student/register/${invite.code}`}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={copyInviteLink}
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" })
-                  )}
-                >
-                  Copiar link
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <InviteQrDialog
+                    code={invite.code}
+                    link={inviteLink || `/student/register/${invite.code}`}
+                    campusName={course.campusName}
+                    courseName={course.name}
+                  />
+                  <button
+                    type="button"
+                    onClick={copyInviteLink}
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" })
+                    )}
+                  >
+                    Copiar link
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="mt-4 grid gap-3">
@@ -379,6 +387,8 @@ export default function CourseDetailPage() {
                       <InviteQrDialog
                         code={item.code}
                         link={buildInviteLink(item.code)}
+                        campusName={course.campusName}
+                        courseName={course.name}
                       />
                       <button
                         type="button"

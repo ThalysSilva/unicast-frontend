@@ -116,6 +116,7 @@ export default function InvitesPage() {
     },
   });
   const courses = structureQuery.data?.courses ?? [];
+  const selectedCourse = courses.find((course) => course.id === courseId);
   const generatedInvites = invitesQuery.data ?? [];
   const courseOptions = courses.map((course) => ({
     value: course.id,
@@ -328,9 +329,17 @@ export default function InvitesPage() {
                 <p>Use esse link no quadro, no slide da aula ou em um QR code externo.</p>
                 <p>O aluno acessa, informa a matricula e completa os dados de contato.</p>
               </div>
-              <Button variant="outline" onClick={copyInviteLink}>
-                Copiar link
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <InviteQrDialog
+                  code={invite}
+                  link={inviteLink || `/student/register/${invite}`}
+                  campusName={selectedCourse?.campusName}
+                  courseName={selectedCourse?.name}
+                />
+                <Button variant="outline" onClick={copyInviteLink}>
+                  Copiar link
+                </Button>
+              </div>
             </div>
           ) : (
             <p className="mt-4 text-sm text-muted-foreground">
@@ -380,6 +389,8 @@ export default function InvitesPage() {
                     <InviteQrDialog
                       code={item.code}
                       link={buildInviteLink(item.code)}
+                      campusName={selectedCourse?.campusName}
+                      courseName={selectedCourse?.name}
                     />
                     <Button
                       type="button"
