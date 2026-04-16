@@ -30,18 +30,21 @@ import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData } from "@/lib/api";
+import {
+  type AcademicCourse,
+  loadAcademicStructure,
+} from "@/lib/academic-structure";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
 import type {
   ApiMessage,
   ApiResponse,
-  Course,
   Student,
   StudentStatus,
 } from "@/lib/types";
 
 const EMPTY_STUDENTS: Student[] = [];
-const EMPTY_COURSES: Course[] = [];
+const EMPTY_COURSES: AcademicCourse[] = [];
 
 const statusFilters: Array<StudentStatus | "ALL"> = [
   "ALL",
@@ -73,8 +76,8 @@ export default function StudentsPage() {
   const coursesQuery = useApiQuery({
     queryKey: queryKeys.courses(),
     queryFn: async () => {
-      const response = await apiRequest<ApiResponse<Course[]>>("/course");
-      return extractData(response);
+      const structure = await loadAcademicStructure();
+      return structure.courses;
     },
   });
 
@@ -124,7 +127,7 @@ export default function StudentsPage() {
   const isLoading = studentsQuery.isLoading || coursesQuery.isLoading;
   const courseOptions = courses.map((course) => ({
     value: course.id,
-    label: course.name,
+    label: `${course.name} / ${course.programName}`,
   }));
 
   const filtered = useMemo(() => {

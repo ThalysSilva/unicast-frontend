@@ -1,49 +1,33 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { StatCard } from "@/components/layout/stat-card";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToastOnError } from "@/components/ui/toast-provider";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData, getAuth, onAuthChange } from "@/lib/api";
+import { loadAcademicStructure } from "@/lib/academic-structure";
 import { queryKeys } from "@/lib/query-keys";
-import type { ApiResponse, Campus, Course, Program, Student } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import type { ApiResponse, Student } from "@/lib/types";
 
-const isProgramLike = (value: unknown): value is Program => {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const candidate = value as Partial<Program>;
-
-  return (
-    typeof candidate.id === "string" &&
-    candidate.id.length > 0 &&
-    typeof candidate.name === "string" &&
-    candidate.name.length > 0
-  );
-};
-
-const extractPrograms = (
-  payload: ApiResponse<Program[]> | Program[] | unknown,
-  campus: Campus
-) => {
-  const data = extractData(payload as ApiResponse<Program[]> | Program[]);
-
-  if (!Array.isArray(data)) {
-    return [];
-  }
-
-  return data.filter(
-    (item): item is Program =>
-      isProgramLike(item) &&
-      (item.id !== campus.id || item.name !== campus.name)
-  );
-};
+const toStudentArray = (value: unknown): Student[] =>
+  Array.isArray(value) ? value : [];
 
 export default function DashboardPage() {
   const [userName, setUserName] = useState("Professor");
@@ -60,40 +44,75 @@ export default function DashboardPage() {
   const summaryQuery = useApiQuery({
     queryKey: queryKeys.dashboardSummary(),
     queryFn: async () => {
-      const campusRes = await apiRequest<ApiResponse<Campus[]>>("/campus");
-      const campuses = extractData(campusRes);
-
-      const programResults = await Promise.allSettled(
-        campuses.map((campus) =>
-          apiRequest<ApiResponse<Program[]>>(`/program/${campus.id}`)
-        )
-      );
-
-      const programs = programResults.flatMap((result, index) => {
-        if (result.status !== "fulfilled") return [];
-        return extractPrograms(result.value, campuses[index]);
-      });
-
-      const [courseRes, studentRes] = await Promise.all([
-        apiRequest<ApiResponse<Course[]>>("/course"),
+      const [structure, studentRes] = await Promise.all([
+        loadAcademicStructure(),
         apiRequest<ApiResponse<Student[]>>("/student"),
       ]);
 
+      const courseStudentResults = await Promise.allSettled(
+        structure.courses.map((course) =>
+          apiRequest<ApiResponse<Student[]>>(`/student?course=${course.id}`)
+        )
+      );
+
+      const studentsByCourse = Object.fromEntries(
+        structure.courses.map((course, index) => {
+          const result = courseStudentResults[index];
+          const courseStudents =
+            result.status === "fulfilled" ? extractData(result.value) : [];
+
+          return [
+            course.id,
+            toStudentArray(courseStudents),
+          ];
+        })
+      );
+
       return {
-        campuses,
-        programs,
-        courses: extractData(courseRes),
+        ...structure,
         students: extractData(studentRes),
+        studentsByCourse,
       };
     },
   });
 
   const campuses = summaryQuery.data?.campuses ?? [];
-  const programs = Array.from(
-    new Map((summaryQuery.data?.programs ?? []).map((program) => [program.id, program])).values()
-  );
+  const programs = summaryQuery.data?.programs ?? [];
   const courses = summaryQuery.data?.courses ?? [];
   const students = summaryQuery.data?.students ?? [];
+  const studentsByCourse = summaryQuery.data?.studentsByCourse ?? {};
+  const coursesWithStats = courses.map((course) => {
+    const courseStudents = toStudentArray(studentsByCourse[course.id]);
+
+    return {
+      ...course,
+      totalStudents: courseStudents.length,
+      activeStudents: courseStudents.filter((student) => student.status === "ACTIVE").length,
+      pendingStudents: courseStudents.filter((student) => student.status === "PENDING").length,
+    };
+  });
+  const campusStats = campuses.map((campus) => {
+    const campusPrograms = programs.filter((program) => program.campusId === campus.id);
+    const campusCourses = coursesWithStats.filter((course) => course.campusId === campus.id);
+
+    return {
+      ...campus,
+      programsCount: campusPrograms.length,
+      coursesCount: campusCourses.length,
+      enrollmentsCount: campusCourses.reduce((sum, course) => sum + course.totalStudents, 0),
+      pendingCount: campusCourses.reduce((sum, course) => sum + course.pendingStudents, 0),
+    };
+  });
+  const programStats = programs.map((program) => {
+    const programCourses = coursesWithStats.filter((course) => course.programId === program.id);
+
+    return {
+      ...program,
+      coursesCount: programCourses.length,
+      enrollmentsCount: programCourses.reduce((sum, course) => sum + course.totalStudents, 0),
+      pendingCount: programCourses.reduce((sum, course) => sum + course.pendingStudents, 0),
+    };
+  });
 
   return (
     <div className="flex flex-col gap-8">
@@ -170,6 +189,208 @@ export default function DashboardPage() {
               <p className="mt-4 text-sm text-muted-foreground">
                 Pendentes ainda nao concluíram o auto-cadastro. Ativos ja podem receber mensagens pelos canais configurados.
               </p>
+            </Card>
+          </section>
+
+          <section>
+            <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Visao geral
+                  </h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Consulte a estrutura por disciplina, curso ou campus e abra o item para continuar o trabalho.
+                  </p>
+                </div>
+                <Link
+                  href="/setup"
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                >
+                  Gerenciar estrutura
+                </Link>
+              </div>
+
+              <Tabs defaultValue="courses" className="mt-5 gap-4">
+                <TabsList className="h-auto flex-wrap justify-start rounded-2xl bg-muted/70 p-1.5">
+                  <TabsTrigger value="courses" className="rounded-xl px-4 py-2">
+                    Disciplinas
+                  </TabsTrigger>
+                  <TabsTrigger value="programs" className="rounded-xl px-4 py-2">
+                    Cursos
+                  </TabsTrigger>
+                  <TabsTrigger value="campuses" className="rounded-xl px-4 py-2">
+                    Campus
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="courses">
+                  <div className="overflow-hidden rounded-2xl border border-border/60">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Disciplina</TableHead>
+                          <TableHead>Campus</TableHead>
+                          <TableHead>Curso</TableHead>
+                          <TableHead>Alunos</TableHead>
+                          <TableHead>Pendentes</TableHead>
+                          <TableHead className="text-right">Acoes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {coursesWithStats.length ? (
+                          coursesWithStats.map((course) => (
+                            <TableRow key={course.id}>
+                              <TableCell>
+                                <p className="font-medium text-foreground">
+                                  {course.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {course.year}/{course.semester}
+                                </p>
+                              </TableCell>
+                              <TableCell>{course.campusName}</TableCell>
+                              <TableCell>{course.programName}</TableCell>
+                              <TableCell>{course.totalStudents}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {course.pendingStudents}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Link
+                                  href={`/courses/${course.id}`}
+                                  className={cn(
+                                    buttonVariants({ variant: "ghost", size: "sm" })
+                                  )}
+                                >
+                                  Abrir
+                                </Link>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                              Nenhuma disciplina cadastrada ainda.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="programs">
+                  <div className="overflow-hidden rounded-2xl border border-border/60">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Curso</TableHead>
+                          <TableHead>Campus</TableHead>
+                          <TableHead>Disciplinas</TableHead>
+                          <TableHead>Matriculas</TableHead>
+                          <TableHead>Pendentes</TableHead>
+                          <TableHead className="text-right">Acoes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {programStats.length ? (
+                          programStats.map((program) => (
+                            <TableRow key={program.id}>
+                              <TableCell>
+                                <p className="font-medium text-foreground">
+                                  {program.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {program.active ? "Ativo" : "Inativo"}
+                                </p>
+                              </TableCell>
+                              <TableCell>{program.campusName}</TableCell>
+                              <TableCell>{program.coursesCount}</TableCell>
+                              <TableCell>{program.enrollmentsCount}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{program.pendingCount}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Link
+                                  href={`/programs/${program.id}`}
+                                  className={cn(
+                                    buttonVariants({ variant: "ghost", size: "sm" })
+                                  )}
+                                >
+                                  Abrir
+                                </Link>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                              Nenhum curso cadastrado ainda.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="campuses">
+                  <div className="overflow-hidden rounded-2xl border border-border/60">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Campus</TableHead>
+                          <TableHead>Cursos</TableHead>
+                          <TableHead>Disciplinas</TableHead>
+                          <TableHead>Matriculas</TableHead>
+                          <TableHead>Pendentes</TableHead>
+                          <TableHead className="text-right">Acoes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {campusStats.length ? (
+                          campusStats.map((campus) => (
+                            <TableRow key={campus.id}>
+                              <TableCell>
+                                <p className="font-medium text-foreground">
+                                  {campus.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {campus.description || "Sem descricao"}
+                                </p>
+                              </TableCell>
+                              <TableCell>{campus.programsCount}</TableCell>
+                              <TableCell>{campus.coursesCount}</TableCell>
+                              <TableCell>{campus.enrollmentsCount}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{campus.pendingCount}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Link
+                                  href={`/campuses/${campus.id}`}
+                                  className={cn(
+                                    buttonVariants({ variant: "ghost", size: "sm" })
+                                  )}
+                                >
+                                  Abrir
+                                </Link>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                              Nenhum campus cadastrado ainda.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </Card>
           </section>
         </>

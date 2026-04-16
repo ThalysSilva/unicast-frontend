@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
@@ -16,9 +17,11 @@ import {
   SelectTrigger,
   SelectValueFromOptions,
 } from "@/components/ui/select";
-import { useToast } from "@/components/ui/toast-provider";
+import { ToastOnError, useToast } from "@/components/ui/toast-provider";
+import { useApiQuery } from "@/hooks/use-api-query";
 import { ApiError, apiRequest, extractData } from "@/lib/api";
-import type { ApiResponse, Course } from "@/lib/types";
+import { loadAcademicStructure } from "@/lib/academic-structure";
+import type { ApiResponse } from "@/lib/types";
 
 const toDateTimeLocalValue = (date: Date) => {
   const offset = date.getTimezoneOffset();
@@ -77,7 +80,7 @@ type InvitePayload = {
 };
 
 export default function InvitesPage() {
-  const [courses, setCourses] = useState<Course[]>([]);
+  const searchParams = useSearchParams();
   const [invite, setInvite] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
   const { showToast } = useToast();
@@ -86,9 +89,15 @@ export default function InvitesPage() {
     defaultValues: { courseId: "", expiresAt: "" },
   });
   const courseId = useWatch({ control: form.control, name: "courseId" });
+  const requestedCourseId = searchParams.get("courseId") ?? "";
+  const structureQuery = useApiQuery({
+    queryKey: ["academic-structure"],
+    queryFn: loadAcademicStructure,
+  });
+  const courses = structureQuery.data?.courses ?? [];
   const courseOptions = courses.map((course) => ({
     value: course.id,
-    label: course.name,
+    label: `${course.name} / ${course.programName}`,
   }));
 
   const loadCurrentInvite = async (selectedCourseId: string) => {
@@ -116,12 +125,15 @@ export default function InvitesPage() {
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    const load = async () => {
-      const coursesRes = await apiRequest<ApiResponse<Course[]>>("/course");
-      setCourses(extractData(coursesRes));
-    };
-    load();
   }, []);
+
+  useEffect(() => {
+    if (!requestedCourseId || !courses.some((course) => course.id === requestedCourseId)) {
+      return;
+    }
+
+    form.setValue("courseId", requestedCourseId);
+  }, [courses, form, requestedCourseId]);
 
   useEffect(() => {
     loadCurrentInvite(courseId).catch(() => {
@@ -182,6 +194,7 @@ export default function InvitesPage() {
         description="Gere o link da disciplina para projetar em sala, colar no mural ou compartilhar com a turma. E o aluno completa o cadastro sozinho."
         badge="Link da turma"
       />
+      <ToastOnError error={structureQuery.error} />
 
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
@@ -201,7 +214,11 @@ export default function InvitesPage() {
               >
                 <SelectTrigger>
                   <SelectValueFromOptions
-                    placeholder="Selecione"
+                    placeholder={
+                      structureQuery.isLoading
+                        ? "Carregando disciplinas..."
+                        : "Selecione"
+                    }
                     options={courseOptions}
                     value={courseId}
                   />
@@ -209,7 +226,7 @@ export default function InvitesPage() {
                 <SelectContent>
                   {courses.map((course) => (
                     <SelectItem key={course.id} value={course.id}>
-                      {course.name}
+                      {course.name} / {course.programName}
                     </SelectItem>
                   ))}
                 </SelectContent>

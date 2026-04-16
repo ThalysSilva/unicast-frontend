@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 
+import { AcademicBreadcrumb } from "@/components/layout/academic-breadcrumb";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -18,10 +21,17 @@ import { loadAcademicStructure } from "@/lib/academic-structure";
 import { cn } from "@/lib/utils";
 import type { ApiMessage } from "@/lib/types";
 
-export default function SetupPage() {
+export default function CampusDetailPage() {
+  const params = useParams<{ id: string }>();
+  const campusId = Array.isArray(params.id) ? params.id[0] : params.id;
   const { showToast } = useToast();
-  const campusForm = useForm({
-    defaultValues: { name: "", description: "" },
+
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      description: "",
+      active: true,
+    },
   });
 
   const structureQuery = useApiQuery({
@@ -29,37 +39,75 @@ export default function SetupPage() {
     queryFn: loadAcademicStructure,
   });
 
-  const campuses = structureQuery.data?.campuses ?? [];
-  const programs = structureQuery.data?.programs ?? [];
+  const campus = useMemo(
+    () => structureQuery.data?.campuses.find((item) => item.id === campusId),
+    [campusId, structureQuery.data?.campuses]
+  );
+  const programs = useMemo(
+    () =>
+      (structureQuery.data?.programs ?? []).filter(
+        (program) => program.campusId === campusId
+      ),
+    [campusId, structureQuery.data?.programs]
+  );
   const courses = structureQuery.data?.courses ?? [];
 
-  const createCampus = async (values: { name: string; description: string }) => {
-    const res = await apiRequest<ApiMessage>("/campus", {
+  const createProgram = async (values: {
+    name: string;
+    description: string;
+    active: boolean;
+  }) => {
+    const res = await apiRequest<ApiMessage>("/program", {
       method: "POST",
-      body: values,
+      body: {
+        ...values,
+        campus_id: campusId,
+      },
     });
 
-    showToast({ title: res.message ?? "Campus criado", variant: "success" });
-    campusForm.reset();
+    showToast({ title: res.message ?? "Curso criado", variant: "success" });
+    form.reset({ name: "", description: "", active: true });
     await structureQuery.refetch();
   };
+
+  if (structureQuery.isLoading) {
+    return <LoadingState label="Carregando campus..." />;
+  }
+
+  if (!campus) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title="Campus nao encontrado"
+          description="Volte para a estrutura academica e selecione um campus cadastrado."
+          badge="Campus"
+        />
+        <Link
+          href="/setup"
+          className={cn(buttonVariants({ variant: "default", size: "lg" }))}
+        >
+          Abrir estrutura
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Estrutura academica"
-        description="Comece pelo campus. Dentro de cada campus voce organiza cursos, e dentro de cada curso cria as disciplinas e acompanha a turma."
-        badge="Fluxo docente"
+        title={campus.name}
+        description={campus.description || "Cursos e disciplinas deste campus."}
+        badge="Campus"
+      />
+      <AcademicBreadcrumb
+        items={[
+          { label: "Estrutura", href: "/setup" },
+          { label: campus.name },
+        ]}
       />
       <ToastOnError error={structureQuery.error} />
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="rounded-2xl border border-border/60 bg-white/90 p-5">
-          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            Campus
-          </p>
-          <p className="mt-2 text-3xl font-semibold">{campuses.length}</p>
-        </Card>
+      <section className="grid gap-4 md:grid-cols-2">
         <Card className="rounded-2xl border border-border/60 bg-white/90 p-5">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Cursos
@@ -70,39 +118,38 @@ export default function SetupPage() {
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Disciplinas
           </p>
-          <p className="mt-2 text-3xl font-semibold">{courses.length}</p>
+          <p className="mt-2 text-3xl font-semibold">
+            {courses.filter((course) => course.campusId === campus.id).length}
+          </p>
         </Card>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 py-0">
           <CardHeader className="border-b border-border/60 px-6 py-6">
-            <CardTitle className="text-lg">Novo campus</CardTitle>
+            <CardTitle className="text-lg">Novo curso</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Campus e a primeira divisao da estrutura. Cursos e disciplinas ficam dentro dele.
+              O curso sera criado dentro de {campus.name}.
             </p>
           </CardHeader>
           <CardContent className="px-6 py-6">
             <form
               className="flex flex-col gap-4"
-              onSubmit={campusForm.handleSubmit(createCampus)}
+              onSubmit={form.handleSubmit(createProgram)}
             >
               <div className="space-y-2">
-                <Label htmlFor="campus-name">Nome</Label>
-                <Input id="campus-name" {...campusForm.register("name")} />
+                <Label htmlFor="program-name">Nome do curso</Label>
+                <Input id="program-name" {...form.register("name")} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="campus-desc">Descricao</Label>
-                <Textarea
-                  id="campus-desc"
-                  {...campusForm.register("description")}
-                />
+                <Label htmlFor="program-desc">Descricao</Label>
+                <Textarea id="program-desc" {...form.register("description")} />
               </div>
               <button
                 type="submit"
                 className={cn(buttonVariants({ variant: "default", size: "lg" }))}
               >
-                Salvar campus
+                Salvar curso
               </button>
             </form>
           </CardContent>
@@ -111,55 +158,51 @@ export default function SetupPage() {
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">Campus cadastrados</h2>
+              <h2 className="text-lg font-semibold">Cursos deste campus</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Abra um campus para criar cursos e navegar pela estrutura dele.
+                Abra um curso para cadastrar disciplinas e acompanhar as turmas.
               </p>
             </div>
+            <Link
+              href="/setup"
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+            >
+              Voltar
+            </Link>
           </div>
 
           <div className="mt-5 grid gap-3">
-            {structureQuery.isLoading ? (
-              <LoadingState label="Carregando campus..." />
-            ) : campuses.length ? (
-              campuses.map((campus) => {
-                const campusPrograms = programs.filter(
-                  (program) => program.campusId === campus.id
-                );
-                const campusCourses = courses.filter(
-                  (course) => course.campusId === campus.id
+            {programs.length ? (
+              programs.map((program) => {
+                const programCourses = courses.filter(
+                  (course) => course.programId === program.id
                 );
 
                 return (
                   <Link
-                    key={campus.id}
-                    href={`/campuses/${campus.id}`}
+                    key={program.id}
+                    href={`/programs/${program.id}`}
                     className="block rounded-2xl border border-border/60 bg-background px-5 py-4 transition hover:border-primary/40 hover:bg-white"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold text-foreground">
-                          {campus.name}
+                          {program.name}
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {campus.description || "Sem descricao"}
+                          {program.description || "Sem descricao"}
                         </p>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline">
-                          {campusPrograms.length} curso(s)
-                        </Badge>
-                        <Badge variant="secondary">
-                          {campusCourses.length} disciplina(s)
-                        </Badge>
-                      </div>
+                      <Badge variant="outline">
+                        {programCourses.length} disciplina(s)
+                      </Badge>
                     </div>
                   </Link>
                 );
               })
             ) : (
               <p className="rounded-2xl border border-border/60 bg-background px-5 py-4 text-sm text-muted-foreground">
-                Nenhum campus cadastrado ainda.
+                Nenhum curso cadastrado neste campus ainda.
               </p>
             )}
           </div>
@@ -168,4 +211,3 @@ export default function SetupPage() {
     </div>
   );
 }
-

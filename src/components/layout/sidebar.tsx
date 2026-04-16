@@ -35,7 +35,12 @@ export const Sidebar = () => {
       </div>
       <nav className="flex flex-1 flex-col gap-2">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive =
+            pathname === item.href ||
+            (item.href === "/setup" &&
+              (pathname.startsWith("/campuses/") ||
+                pathname.startsWith("/programs/") ||
+                pathname.startsWith("/courses/")));
           const Icon = item.icon;
           return (
             <Link
