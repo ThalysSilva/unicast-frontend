@@ -109,7 +109,7 @@ export default function DashboardPage() {
       ) : !summaryQuery.isError ? (
         <>
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Campi" value={campuses.length} />
+            <StatCard label="Campus" value={campuses.length} />
             <StatCard label="Cursos" value={programs.length} />
             <StatCard label="Disciplinas" value={courses.length} />
             <StatCard label="Alunos" value={students.length} />
