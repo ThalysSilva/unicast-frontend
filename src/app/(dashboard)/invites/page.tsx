@@ -36,6 +36,13 @@ const toDateTimeLocalValue = (date: Date) => {
   return localDate.toISOString().slice(0, 16);
 };
 
+const buildMinimumInviteExpiration = () => {
+  const date = new Date();
+  date.setSeconds(0, 0);
+  date.setMinutes(date.getMinutes() + 1);
+  return toDateTimeLocalValue(date);
+};
+
 const buildEndOfDay = (daysFromNow: number) => {
   const date = new Date();
   date.setDate(date.getDate() + daysFromNow);
@@ -85,9 +92,11 @@ export default function InvitesPage() {
   const { showToast } = useToast();
 
   const form = useForm({
-    defaultValues: { courseId: "", expiresAt: "" },
+    defaultValues: { campusId: "", courseId: "", expiresAt: "" },
   });
+  const campusId = useWatch({ control: form.control, name: "campusId" });
   const courseId = useWatch({ control: form.control, name: "courseId" });
+  const expiresAt = useWatch({ control: form.control, name: "expiresAt" });
   const requestedCourseId = searchParams.get("courseId") ?? "";
   const structureQuery = useApiQuery({
     queryKey: ["academic-structure"],
@@ -116,12 +125,34 @@ export default function InvitesPage() {
     },
   });
   const courses = structureQuery.data?.courses ?? [];
+  const campuses = structureQuery.data?.campuses ?? [];
+  const campusHasCourses = (selectedCampusId: string) =>
+    courses.some((course) => course.campusId === selectedCampusId);
+  const campusCourses = campusId
+    ? courses.filter((course) => course.campusId === campusId)
+    : [];
   const selectedCourse = courses.find((course) => course.id === courseId);
   const generatedInvites = invitesQuery.data ?? [];
-  const courseOptions = courses.map((course) => ({
-    value: course.id,
-    label: `${course.name} / ${course.programName}`,
+  const campusOptions = campuses.map((campus) => ({
+    value: campus.id,
+    label: campusHasCourses(campus.id)
+      ? campus.name
+      : `${campus.name} (sem disciplina registrada)`,
   }));
+  const courseOptions = campusCourses.map((course) => ({
+    value: course.id,
+    label: `${course.programName} / ${course.name}`,
+  })).sort((first, second) =>
+    first.label.localeCompare(second.label, "pt-BR", { sensitivity: "base" })
+  );
+  const sortedCampusCourses = [...campusCourses].sort((first, second) => {
+    const firstLabel = `${first.programName} / ${first.name}`;
+    const secondLabel = `${second.programName} / ${second.name}`;
+
+    return firstLabel.localeCompare(secondLabel, "pt-BR", {
+      sensitivity: "base",
+    });
+  });
 
   const loadCurrentInvite = async (selectedCourseId: string) => {
     if (!selectedCourseId) {
@@ -151,10 +182,16 @@ export default function InvitesPage() {
   }, []);
 
   useEffect(() => {
-    if (!requestedCourseId || !courses.some((course) => course.id === requestedCourseId)) {
+    if (!requestedCourseId) {
       return;
     }
 
+    const requestedCourse = courses.find((course) => course.id === requestedCourseId);
+    if (!requestedCourse) {
+      return;
+    }
+
+    form.setValue("campusId", requestedCourse.campusId);
     form.setValue("courseId", requestedCourseId);
   }, [courses, form, requestedCourseId]);
 
@@ -168,6 +205,7 @@ export default function InvitesPage() {
   }, [courseId, showToast]);
 
   const createInvite = async (values: {
+    campusId: string;
     courseId: string;
     expiresAt?: string;
   }) => {
@@ -175,6 +213,14 @@ export default function InvitesPage() {
       showToast({ title: "Selecione uma disciplina", variant: "error" });
       return;
     }
+    if (values.expiresAt && new Date(values.expiresAt).getTime() <= Date.now()) {
+      showToast({
+        title: "A data de expiração precisa ser posterior ao momento atual.",
+        variant: "error",
+      });
+      return;
+    }
+
     const payload = values.expiresAt
       ? { expiresAt: new Date(values.expiresAt).toISOString() }
       : undefined;
@@ -217,6 +263,10 @@ export default function InvitesPage() {
   };
   const buildInviteLink = (code: string) =>
     origin && code ? `${origin}/student/register/${code}` : `/student/register/${code}`;
+  const minExpiresAt = buildMinimumInviteExpiration();
+  const expiresAtIsPast =
+    Boolean(expiresAt) && new Date(expiresAt).getTime() <= Date.now();
+  const expiresAtField = form.register("expiresAt");
 
   return (
     <div className="flex flex-col gap-8">
@@ -238,38 +288,109 @@ export default function InvitesPage() {
             onSubmit={form.handleSubmit(createInvite)}
           >
             <div className="space-y-2">
-              <Label>Disciplina</Label>
+              <Label>Campus</Label>
               <Select
-                value={courseId}
-                onValueChange={(value) => form.setValue("courseId", value ?? "")}
+                value={campusId}
+                onValueChange={(value) => {
+                  form.setValue("campusId", value ?? "");
+                  form.setValue("courseId", "");
+                  setInvite(null);
+                }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValueFromOptions
                     placeholder={
                       structureQuery.isLoading
-                        ? "Carregando disciplinas..."
-                        : "Selecione"
+                        ? "Carregando campus..."
+                        : "Selecione o campus"
                     }
-                    options={courseOptions}
-                    value={courseId}
+                    options={campusOptions}
+                    value={campusId}
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {courses.map((course) => (
-                    <SelectItem key={course.id} value={course.id}>
-                      {course.name} / {course.programName}
+                  {campuses.map((campus) => (
+                    <SelectItem
+                      key={campus.id}
+                      value={campus.id}
+                      disabled={!campusHasCourses(campus.id)}
+                    >
+                      {campusHasCourses(campus.id)
+                        ? campus.name
+                        : `${campus.name} (sem disciplina registrada)`}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
+              <Label>Curso / disciplina</Label>
+              <Select
+                value={courseId}
+                onValueChange={(value) => form.setValue("courseId", value ?? "")}
+                disabled={!campusId || !campusCourses.length}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValueFromOptions
+                    placeholder={
+                      structureQuery.isLoading
+                        ? "Carregando disciplinas..."
+                        : campusId
+                          ? campusCourses.length
+                            ? "Selecione a disciplina"
+                            : "Nenhuma disciplina neste campus"
+                          : "Selecione um campus primeiro"
+                    }
+                    options={courseOptions}
+                    value={courseId}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {sortedCampusCourses.map((course) => (
+                    <SelectItem key={course.id} value={course.id}>
+                      {course.programName} / {course.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {campusId && !campusCourses.length ? (
+                <p className="text-xs text-muted-foreground">
+                  Cadastre uma disciplina neste campus antes de gerar convites.
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="invite-exp">Expira em</Label>
               <Input
                 id="invite-exp"
                 type="datetime-local"
-                {...form.register("expiresAt")}
+                min={minExpiresAt}
+                aria-invalid={expiresAtIsPast}
+                {...expiresAtField}
+                onBlur={(event) => {
+                  expiresAtField.onBlur(event);
+
+                  if (
+                    event.currentTarget.value &&
+                    new Date(event.currentTarget.value).getTime() <= Date.now()
+                  ) {
+                    form.setValue("expiresAt", buildMinimumInviteExpiration(), {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                    showToast({
+                      title:
+                        "A data de expiração foi ajustada para o próximo horário disponível.",
+                      variant: "error",
+                    });
+                  }
+                }}
               />
+              {expiresAtIsPast ? (
+                <p className="text-xs text-destructive">
+                  Escolha um horário posterior ao momento atual.
+                </p>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -308,7 +429,9 @@ export default function InvitesPage() {
                 O horário é preenchido no seu fuso local e convertido automaticamente para o formato aceito pelo backend.
               </p>
             </div>
-            <Button type="submit">Gerar convite</Button>
+            <Button type="submit" disabled={!courseId}>
+              Gerar convite
+            </Button>
           </form>
         </Card>
 
@@ -352,7 +475,9 @@ export default function InvitesPage() {
       <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">Links gerados</h2>
+            <h2 className="text-lg font-semibold">
+              Convites gerados pela disciplina selecionada
+            </h2>
             <p className="mt-2 text-sm text-muted-foreground">
               Historico de convites da disciplina selecionada.
             </p>
@@ -377,15 +502,17 @@ export default function InvitesPage() {
                 key={item.id}
                 className="rounded-2xl border border-border/60 bg-background px-5 py-4"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-semibold text-foreground">{item.code}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {formatInviteExpiration(item.expiresAt)}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <p className="text-sm text-muted-foreground">
+                        {formatInviteExpiration(item.expiresAt)}
+                      </p>
+                      <Badge variant="outline">{inviteStatusLabel(item)}</Badge>
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline">{inviteStatusLabel(item)}</Badge>
                     <InviteQrDialog
                       code={item.code}
                       link={buildInviteLink(item.code)}
