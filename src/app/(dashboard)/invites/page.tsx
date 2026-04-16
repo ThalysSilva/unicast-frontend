@@ -18,10 +18,16 @@ import {
   SelectValueFromOptions,
 } from "@/components/ui/select";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
+import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { ApiError, apiRequest, extractData } from "@/lib/api";
 import { loadAcademicStructure } from "@/lib/academic-structure";
-import type { ApiResponse } from "@/lib/types";
+import {
+  formatInviteExpiration,
+  inviteStatusLabel,
+  type InvitePayload,
+} from "@/lib/invites";
+import type { ApiMessage, ApiResponse } from "@/lib/types";
 
 const toDateTimeLocalValue = (date: Date) => {
   const offset = date.getTimezoneOffset();
@@ -71,14 +77,6 @@ const extractInviteCode = (payload: unknown) => {
   return typeof fallbackTopLevel === "string" ? fallbackTopLevel : null;
 };
 
-type InvitePayload = {
-  id: string;
-  courseId: string;
-  code: string;
-  expiresAt?: string | null;
-  active: boolean;
-};
-
 export default function InvitesPage() {
   const searchParams = useSearchParams();
   const [invite, setInvite] = useState<string | null>(null);
@@ -94,7 +92,30 @@ export default function InvitesPage() {
     queryKey: ["academic-structure"],
     queryFn: loadAcademicStructure,
   });
+  const invitesQuery = useApiQuery({
+    queryKey: ["invites", { courseId }],
+    enabled: Boolean(courseId),
+    queryFn: async () => {
+      const response = await apiRequest<ApiResponse<InvitePayload[]>>(
+        `/invite/${courseId}`
+      );
+      const data = extractData(response);
+      return Array.isArray(data) ? data : [];
+    },
+  });
+  const deleteInviteMutation = useApiMutation<ApiMessage, string>({
+    mutationFn: (inviteId) =>
+      apiRequest<ApiMessage>(`/invite/${inviteId}`, { method: "DELETE" }),
+    onSuccess: async (res) => {
+      showToast({
+        title: res.message ?? "Convite removido com sucesso",
+        variant: "success",
+      });
+      await Promise.all([invitesQuery.refetch(), loadCurrentInvite(courseId)]);
+    },
+  });
   const courses = structureQuery.data?.courses ?? [];
+  const generatedInvites = invitesQuery.data ?? [];
   const courseOptions = courses.map((course) => ({
     value: course.id,
     label: `${course.name} / ${course.programName}`,
@@ -169,6 +190,7 @@ export default function InvitesPage() {
     }
 
     const currentCode = await loadCurrentInvite(values.courseId);
+    await invitesQuery.refetch();
     if (!currentCode && !code) {
       showToast({
         title: "O convite foi criado, mas o codigo nao voltou na resposta.",
@@ -186,6 +208,12 @@ export default function InvitesPage() {
     await navigator.clipboard.writeText(inviteLink);
     showToast({ title: "Link copiado", variant: "success" });
   };
+  const copyInviteCode = async (code: string) => {
+    const link =
+      origin && code ? `${origin}/student/register/${code}` : `/student/register/${code}`;
+    await navigator.clipboard.writeText(link);
+    showToast({ title: "Link copiado", variant: "success" });
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -194,7 +222,7 @@ export default function InvitesPage() {
         description="Gere o link da disciplina para projetar em sala, colar no mural ou compartilhar com a turma. E o aluno completa o cadastro sozinho."
         badge="Link da turma"
       />
-      <ToastOnError error={structureQuery.error} />
+      <ToastOnError error={structureQuery.error ?? invitesQuery.error} />
 
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
@@ -309,6 +337,78 @@ export default function InvitesPage() {
           )}
         </Card>
       </section>
+
+      <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Links gerados</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Historico de convites da disciplina selecionada.
+            </p>
+          </div>
+          {courseId ? (
+            <Badge variant="outline">{generatedInvites.length} link(s)</Badge>
+          ) : null}
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          {!courseId ? (
+            <p className="rounded-2xl border border-border/60 bg-background px-5 py-4 text-sm text-muted-foreground">
+              Selecione uma disciplina para ver os links ja gerados.
+            </p>
+          ) : invitesQuery.isLoading ? (
+            <p className="rounded-2xl border border-border/60 bg-background px-5 py-4 text-sm text-muted-foreground">
+              Carregando links...
+            </p>
+          ) : generatedInvites.length ? (
+            generatedInvites.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-2xl border border-border/60 bg-background px-5 py-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-foreground">{item.code}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {formatInviteExpiration(item.expiresAt)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">{inviteStatusLabel(item)}</Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyInviteCode(item.code)}
+                    >
+                      Copiar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={
+                        deleteInviteMutation.isPending &&
+                        deleteInviteMutation.variables === item.id
+                      }
+                      onClick={() => deleteInviteMutation.mutate(item.id)}
+                    >
+                      {deleteInviteMutation.isPending &&
+                      deleteInviteMutation.variables === item.id
+                        ? "Removendo..."
+                        : "Remover"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="rounded-2xl border border-border/60 bg-background px-5 py-4 text-sm text-muted-foreground">
+              Nenhum link foi gerado para esta disciplina ainda.
+            </p>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }

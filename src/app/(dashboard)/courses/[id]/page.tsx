@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
+import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { ApiError, apiRequest, extractData } from "@/lib/api";
 import {
@@ -27,16 +28,13 @@ import {
   loadAcademicStructure,
 } from "@/lib/academic-structure";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
+import {
+  formatInviteExpiration,
+  inviteStatusLabel,
+  type InvitePayload,
+} from "@/lib/invites";
 import { cn } from "@/lib/utils";
-import type { ApiResponse, Student, StudentStatus } from "@/lib/types";
-
-type InvitePayload = {
-  id: string;
-  courseId: string;
-  code: string;
-  expiresAt?: string | null;
-  active: boolean;
-};
+import type { ApiMessage, ApiResponse, Student, StudentStatus } from "@/lib/types";
 
 const statusOrder: StudentStatus[] = [
   "ACTIVE",
@@ -91,6 +89,28 @@ export default function CourseDetailPage() {
       }
     },
   });
+  const invitesQuery = useApiQuery({
+    queryKey: ["invites", { courseId }],
+    enabled: Boolean(courseId),
+    queryFn: async () => {
+      const response = await apiRequest<ApiResponse<InvitePayload[]>>(
+        `/invite/${courseId}`
+      );
+      const data = extractData(response);
+      return Array.isArray(data) ? data : [];
+    },
+  });
+  const deleteInviteMutation = useApiMutation<ApiMessage, string>({
+    mutationFn: (inviteId) =>
+      apiRequest<ApiMessage>(`/invite/${inviteId}`, { method: "DELETE" }),
+    onSuccess: async (res) => {
+      showToast({
+        title: res.message ?? "Convite removido com sucesso",
+        variant: "success",
+      });
+      await Promise.all([invitesQuery.refetch(), inviteQuery.refetch()]);
+    },
+  });
 
   const course = useMemo<AcademicCourse | undefined>(
     () =>
@@ -99,12 +119,20 @@ export default function CourseDetailPage() {
   );
   const students = studentsQuery.data ?? EMPTY_STUDENTS;
   const invite = inviteQuery.data ?? null;
+  const invites = invitesQuery.data ?? [];
   const inviteLink =
     invite?.code && origin ? `${origin}/student/register/${invite.code}` : "";
   const queryError =
-    structureQuery.error ?? studentsQuery.error ?? inviteQuery.error ?? null;
+    structureQuery.error ??
+    studentsQuery.error ??
+    inviteQuery.error ??
+    invitesQuery.error ??
+    null;
   const isLoading =
-    structureQuery.isLoading || studentsQuery.isLoading || inviteQuery.isLoading;
+    structureQuery.isLoading ||
+    studentsQuery.isLoading ||
+    inviteQuery.isLoading ||
+    invitesQuery.isLoading;
 
   const statusStats = statusOrder.map((status) => ({
     status,
@@ -121,6 +149,12 @@ export default function CourseDetailPage() {
   const copyInviteLink = async () => {
     if (!inviteLink) return;
     await navigator.clipboard.writeText(inviteLink);
+    showToast({ title: "Link copiado", variant: "success" });
+  };
+  const copyInviteCode = async (code: string) => {
+    const link =
+      origin && code ? `${origin}/student/register/${code}` : `/student/register/${code}`;
+    await navigator.clipboard.writeText(link);
     showToast({ title: "Link copiado", variant: "success" });
   };
 
@@ -317,6 +351,69 @@ export default function CourseDetailPage() {
                 </Link>
               </div>
             )}
+          </Card>
+
+          <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
+            <h2 className="text-lg font-semibold">Links gerados</h2>
+            <div className="mt-4 grid gap-3">
+              {invites.length ? (
+                invites.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl border border-border/60 bg-background px-4 py-3"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-foreground">
+                          {item.code}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatInviteExpiration(item.expiresAt)}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{inviteStatusLabel(item)}</Badge>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => copyInviteCode(item.code)}
+                        className={cn(
+                          buttonVariants({
+                            variant: "ghost",
+                            size: "sm",
+                          })
+                        )}
+                      >
+                        Copiar link
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          deleteInviteMutation.isPending &&
+                          deleteInviteMutation.variables === item.id
+                        }
+                        onClick={() => deleteInviteMutation.mutate(item.id)}
+                        className={cn(
+                          buttonVariants({
+                            variant: "destructive",
+                            size: "sm",
+                          })
+                        )}
+                      >
+                        {deleteInviteMutation.isPending &&
+                        deleteInviteMutation.variables === item.id
+                          ? "Removendo..."
+                          : "Remover"}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum link foi gerado para esta disciplina ainda.
+                </p>
+              )}
+            </div>
           </Card>
 
           <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
