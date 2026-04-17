@@ -11,7 +11,7 @@ export const normalizePhone = (value: string) => {
   const digits = onlyDigits(trimmed);
   if (!digits) return "";
 
-  return `+${digits}`;
+  return digits;
 };
 
 export const formatInternationalPhoneInput = (value: string) => {
@@ -45,5 +45,5 @@ export const isValidInternationalPhone = (value: string) => {
   const normalized = normalizePhone(value);
   const digits = onlyDigits(normalized);
 
-  return normalized.startsWith("+") && digits.length >= 10 && digits.length <= 15;
+  return digits.length >= 10 && digits.length <= 15;
 };
