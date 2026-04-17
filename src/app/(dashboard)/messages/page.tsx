@@ -13,7 +13,6 @@ import {
   DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -48,7 +47,7 @@ import type {
   WhatsappInstance,
 } from "@/lib/types";
 
-const EMPTY_STUDENTS: Student[] = [];
+const EMPTY_STUDENTS: AudienceStudent[] = [];
 const EMPTY_DISCIPLINES: AcademicDiscipline[] = [];
 const EMPTY_SMTP: SmtpInstance[] = [];
 const EMPTY_WHATSAPP: WhatsappInstance[] = [];
@@ -56,15 +55,72 @@ const EMPTY_WHATSAPP: WhatsappInstance[] = [];
 const toStudentArray = (value: unknown): Student[] =>
   Array.isArray(value) ? value : [];
 
+type AudienceStudent = Student & {
+  campusNames: string[];
+  disciplineNames: string[];
+};
+
 const sortByLabel = <T,>(items: T[], getLabel: (item: T) => string) =>
   [...items].sort((a, b) =>
     getLabel(a).localeCompare(getLabel(b), "pt-BR", { sensitivity: "base" })
   );
 
-const uniqueStudents = (groups: Student[][]) =>
-  Array.from(
-    new Map(groups.flat().map((student) => [student.id, student])).values()
-  );
+const aggregateAudienceStudents = (
+  groups: Array<{ discipline: AcademicDiscipline; students: Student[] }>
+): AudienceStudent[] => {
+  const byStudent = new Map<
+    string,
+    {
+      student: Student;
+      campusNames: Set<string>;
+      disciplineNames: Set<string>;
+    }
+  >();
+
+  for (const group of groups) {
+    for (const student of group.students) {
+      const current =
+        byStudent.get(student.id) ??
+        {
+          student,
+          campusNames: new Set<string>(),
+          disciplineNames: new Set<string>(),
+        };
+
+      current.campusNames.add(group.discipline.campusName);
+      current.disciplineNames.add(group.discipline.name);
+      byStudent.set(student.id, current);
+    }
+  }
+
+  return Array.from(byStudent.values()).map((item) => ({
+    ...item.student,
+    campusNames: Array.from(item.campusNames).sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" })
+    ),
+    disciplineNames: Array.from(item.disciplineNames).sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" })
+    ),
+  }));
+};
+
+const audienceContextLabel = (student: AudienceStudent) => {
+  const disciplines =
+    student.disciplineNames.length === 1
+      ? "1 disciplina"
+      : `${student.disciplineNames.length} disciplinas`;
+  const campuses =
+    student.campusNames.length === 1
+      ? "1 campus"
+      : `${student.campusNames.length} campus`;
+
+  return `${disciplines} · ${campuses}`;
+};
+
+const formatAudienceList = (items: string[]) => {
+  if (items.length <= 2) return items.join(", ");
+  return `${items.slice(0, 2).join(", ")} +${items.length - 2}`;
+};
 
 const sameSelection = (a: string[], b: string[]) =>
   a.length === b.length && a.every((item, index) => item === b[index]);
@@ -146,24 +202,38 @@ export default function MessagesPage() {
     [excludedDisciplineIds, selectedCampusDisciplineIds, selectedDisciplineIds]
   );
   const selectedScopeKey = selectedScopeDisciplineIds.join("|");
+  const selectedScopeDisciplines = useMemo(
+    () =>
+      selectedScopeDisciplineIds
+        .map((disciplineId) =>
+          disciplines.find((discipline) => discipline.id === disciplineId)
+        )
+        .filter((discipline): discipline is AcademicDiscipline => Boolean(discipline)),
+    [disciplines, selectedScopeDisciplineIds]
+  );
 
   const studentsQuery = useApiQuery({
     queryKey: ["students", { disciplines: selectedScopeKey }],
-    enabled: selectedScopeDisciplineIds.length > 0,
+    enabled:
+      selectedScopeDisciplineIds.length > 0 &&
+      selectedScopeDisciplines.length === selectedScopeDisciplineIds.length,
     queryFn: async () => {
       const results = await Promise.allSettled(
-        selectedScopeDisciplineIds.map(async (disciplineId) => {
-          const params = new URLSearchParams({ discipline: disciplineId });
+        selectedScopeDisciplines.map(async (discipline) => {
+          const params = new URLSearchParams({ discipline: discipline.id });
           const response = await apiRequest<ApiResponse<Student[]>>(
             `/student?${params.toString()}`
           );
-          return toStudentArray(extractData(response));
+          return {
+            discipline,
+            students: toStudentArray(extractData(response)),
+          };
         })
       );
 
-      return uniqueStudents(
+      return aggregateAudienceStudents(
         results.flatMap((result) =>
-          result.status === "fulfilled" ? [result.value] : []
+          result.status === "fulfilled" && result.value ? [result.value] : []
         )
       );
     },
@@ -602,10 +672,21 @@ export default function MessagesPage() {
                     <p className="text-xs text-muted-foreground">
                       {student.email ?? "-"} · {formatPhone(student.phone)}
                     </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {audienceContextLabel(student)} ·{" "}
+                      {formatAudienceList(student.disciplineNames)}
+                    </p>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {studentStatusLabel(student.status)}
-                  </Badge>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {studentStatusLabel(student.status)}
+                    </Badge>
+                    {student.campusNames.length > 1 ? (
+                      <Badge variant="outline" className="text-xs">
+                        {student.campusNames.length} campus
+                      </Badge>
+                    ) : null}
+                  </div>
                 </button>
               ))
             ) : (
