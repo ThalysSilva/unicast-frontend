@@ -2,14 +2,14 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { FormProvider, useForm, useWatch } from "react-hook-form";
 
+import { FormInput } from "@/components/forms/form-fields";
 import { InviteQrDialog } from "@/components/invites/invite-qr-dialog";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -29,6 +29,12 @@ import {
   type InvitePayload,
 } from "@/lib/invites";
 import type { ApiMessage, ApiResponse } from "@/lib/types";
+
+type InviteFormValues = {
+  campusId: string;
+  disciplineId: string;
+  expiresAt: string;
+};
 
 const toDateTimeLocalValue = (date: Date) => {
   const offset = date.getTimezoneOffset();
@@ -91,7 +97,7 @@ export default function InvitesPage() {
   const [origin, setOrigin] = useState("");
   const { showToast } = useToast();
 
-  const form = useForm({
+  const form = useForm<InviteFormValues>({
     defaultValues: { campusId: "", disciplineId: "", expiresAt: "" },
   });
   const campusId = useWatch({ control: form.control, name: "campusId" });
@@ -264,9 +270,6 @@ export default function InvitesPage() {
   const buildInviteLink = (code: string) =>
     origin && code ? `${origin}/student/register/${code}` : `/student/register/${code}`;
   const minExpiresAt = buildMinimumInviteExpiration();
-  const expiresAtIsPast =
-    Boolean(expiresAt) && new Date(expiresAt).getTime() <= Date.now();
-  const expiresAtField = form.register("expiresAt");
 
   return (
     <div className="flex flex-col gap-8">
@@ -283,10 +286,11 @@ export default function InvitesPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             O convite serve para o aluno informar matricula, nome, email e telefone sem o professor precisar coletar isso manualmente.
           </p>
-          <form
-            className="mt-4 flex flex-col gap-4"
-            onSubmit={form.handleSubmit(createInvite)}
-          >
+          <FormProvider {...form}>
+            <form
+              className="mt-4 flex flex-col gap-4"
+              onSubmit={form.handleSubmit(createInvite)}
+            >
             <div className="space-y-2">
               <Label>Campus</Label>
               <Select
@@ -360,16 +364,18 @@ export default function InvitesPage() {
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="invite-exp">Expira em</Label>
-              <Input
-                id="invite-exp"
+              <FormInput<InviteFormValues>
+                name="expiresAt"
+                label="Expira em"
                 type="datetime-local"
                 min={minExpiresAt}
-                aria-invalid={expiresAtIsPast}
-                {...expiresAtField}
+                rules={{
+                  validate: (value) =>
+                    !value ||
+                    new Date(value).getTime() > Date.now() ||
+                    "Escolha um horário posterior ao momento atual.",
+                }}
                 onBlur={(event) => {
-                  expiresAtField.onBlur(event);
-
                   if (
                     event.currentTarget.value &&
                     new Date(event.currentTarget.value).getTime() <= Date.now()
@@ -386,17 +392,17 @@ export default function InvitesPage() {
                   }
                 }}
               />
-              {expiresAtIsPast ? (
-                <p className="text-xs text-destructive">
-                  Escolha um horário posterior ao momento atual.
-                </p>
-              ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => form.setValue("expiresAt", buildEndOfDay(0))}
+                  onClick={() =>
+                    form.setValue("expiresAt", buildEndOfDay(0), {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
                 >
                   Hoje, 23:59
                 </Button>
@@ -404,7 +410,12 @@ export default function InvitesPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => form.setValue("expiresAt", buildEndOfDay(1))}
+                  onClick={() =>
+                    form.setValue("expiresAt", buildEndOfDay(1), {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
                 >
                   Amanhã, 23:59
                 </Button>
@@ -412,7 +423,12 @@ export default function InvitesPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => form.setValue("expiresAt", buildEndOfDay(7))}
+                  onClick={() =>
+                    form.setValue("expiresAt", buildEndOfDay(7), {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
                 >
                   7 dias
                 </Button>
@@ -420,7 +436,12 @@ export default function InvitesPage() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => form.setValue("expiresAt", "")}
+                  onClick={() =>
+                    form.setValue("expiresAt", "", {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
                 >
                   Sem expiração
                 </Button>
@@ -432,7 +453,8 @@ export default function InvitesPage() {
             <Button type="submit" disabled={!disciplineId}>
               Gerar convite
             </Button>
-          </form>
+            </form>
+          </FormProvider>
         </Card>
 
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">

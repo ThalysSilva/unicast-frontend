@@ -3,12 +3,11 @@
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 
+import { FormEmailInput, FormInput } from "@/components/forms/form-fields";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
 import Link from "next/link";
 
@@ -27,11 +26,11 @@ type FormValues = z.infer<typeof schema>;
 export default function LoginPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  const form = useForm<FormValues>({ resolver: zodResolver(schema) });
   const {
-    register,
     handleSubmit,
     formState: { isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+  } = form;
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -65,27 +64,22 @@ export default function LoginPage() {
             Entre para gerenciar alunos, cursos e mensagens.
           </p>
         </div>
-        <form
-          className="mt-6 flex flex-col gap-5"
-          onSubmit={handleSubmit(onSubmit)}
-        >
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
+        <FormProvider {...form}>
+          <form
+            className="mt-6 flex flex-col gap-5"
+            onSubmit={handleSubmit(onSubmit)}
+          >
+            <FormEmailInput<FormValues>
+              name="email"
+              label="Email"
               placeholder="prof@escola.com"
-              {...register("email")}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Senha</Label>
-            <Input id="password" type="password" {...register("password")} />
-          </div>
-          <Button type="submit" size="lg" disabled={isSubmitting}>
-            {isSubmitting ? "Entrando..." : "Entrar"}
-          </Button>
-        </form>
+            <FormInput<FormValues> name="password" label="Senha" type="password" />
+            <Button type="submit" size="lg" disabled={isSubmitting}>
+              {isSubmitting ? "Entrando..." : "Entrar"}
+            </Button>
+          </form>
+        </FormProvider>
         <div className="mt-6 text-center text-sm text-muted-foreground">
           Ainda nao tem conta?{" "}
           <Link

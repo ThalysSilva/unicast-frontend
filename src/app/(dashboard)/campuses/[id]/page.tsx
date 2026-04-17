@@ -3,30 +3,35 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 
+import { FormInput, FormTextarea } from "@/components/forms/form-fields";
 import { AcademicBreadcrumb } from "@/components/layout/academic-breadcrumb";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
-import { Textarea } from "@/components/ui/textarea";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest } from "@/lib/api";
 import { loadAcademicStructure } from "@/lib/academic-structure";
 import { cn } from "@/lib/utils";
+import { requiredTrimmed } from "@/lib/validation";
 import type { ApiMessage } from "@/lib/types";
+
+type ProgramFormValues = {
+  name: string;
+  description: string;
+  active: boolean;
+};
 
 export default function CampusDetailPage() {
   const params = useParams<{ id: string }>();
   const campusId = Array.isArray(params.id) ? params.id[0] : params.id;
   const { showToast } = useToast();
 
-  const form = useForm({
+  const form = useForm<ProgramFormValues>({
     defaultValues: {
       name: "",
       description: "",
@@ -52,11 +57,7 @@ export default function CampusDetailPage() {
   );
   const disciplines = structureQuery.data?.disciplines ?? [];
 
-  const createProgram = async (values: {
-    name: string;
-    description: string;
-    active: boolean;
-  }) => {
+  const createProgram = async (values: ProgramFormValues) => {
     const res = await apiRequest<ApiMessage>("/program", {
       method: "POST",
       body: {
@@ -133,25 +134,31 @@ export default function CampusDetailPage() {
             </p>
           </CardHeader>
           <CardContent className="px-6 py-6">
-            <form
-              className="flex flex-col gap-4"
-              onSubmit={form.handleSubmit(createProgram)}
-            >
-              <div className="space-y-2">
-                <Label htmlFor="program-name">Nome do curso</Label>
-                <Input id="program-name" {...form.register("name")} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="program-desc">Descricao</Label>
-                <Textarea id="program-desc" {...form.register("description")} />
-              </div>
-              <button
-                type="submit"
-                className={cn(buttonVariants({ variant: "default", size: "lg" }))}
+            <FormProvider {...form}>
+              <form
+                className="flex flex-col gap-4"
+                onSubmit={form.handleSubmit(createProgram)}
               >
-                Salvar curso
-              </button>
-            </form>
+                <FormInput<ProgramFormValues>
+                  name="name"
+                  label="Nome do curso"
+                  rules={{
+                    required: "Informe o nome do curso",
+                    validate: requiredTrimmed("Informe o nome do curso"),
+                  }}
+                />
+                <FormTextarea<ProgramFormValues>
+                  name="description"
+                  label="Descricao"
+                />
+                <button
+                  type="submit"
+                  className={cn(buttonVariants({ variant: "default", size: "lg" }))}
+                >
+                  Salvar curso
+                </button>
+              </form>
+            </FormProvider>
           </CardContent>
         </Card>
 

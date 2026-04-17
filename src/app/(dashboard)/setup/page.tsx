@@ -1,26 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 
+import { FormInput, FormTextarea } from "@/components/forms/form-fields";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
-import { Textarea } from "@/components/ui/textarea";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest } from "@/lib/api";
 import { loadAcademicStructure } from "@/lib/academic-structure";
 import { cn } from "@/lib/utils";
+import { requiredTrimmed } from "@/lib/validation";
 import type { ApiMessage } from "@/lib/types";
+
+type CampusFormValues = { name: string; description: string };
 
 export default function SetupPage() {
   const { showToast } = useToast();
-  const campusForm = useForm({
+  const campusForm = useForm<CampusFormValues>({
     defaultValues: { name: "", description: "" },
   });
 
@@ -33,7 +34,7 @@ export default function SetupPage() {
   const programs = structureQuery.data?.programs ?? [];
   const disciplines = structureQuery.data?.disciplines ?? [];
 
-  const createCampus = async (values: { name: string; description: string }) => {
+  const createCampus = async (values: CampusFormValues) => {
     const res = await apiRequest<ApiMessage>("/campus", {
       method: "POST",
       body: values,
@@ -83,28 +84,31 @@ export default function SetupPage() {
             </p>
           </CardHeader>
           <CardContent className="px-6 py-6">
-            <form
-              className="flex flex-col gap-4"
-              onSubmit={campusForm.handleSubmit(createCampus)}
-            >
-              <div className="space-y-2">
-                <Label htmlFor="campus-name">Nome</Label>
-                <Input id="campus-name" {...campusForm.register("name")} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="campus-desc">Descricao</Label>
-                <Textarea
-                  id="campus-desc"
-                  {...campusForm.register("description")}
-                />
-              </div>
-              <button
-                type="submit"
-                className={cn(buttonVariants({ variant: "default", size: "lg" }))}
+            <FormProvider {...campusForm}>
+              <form
+                className="flex flex-col gap-4"
+                onSubmit={campusForm.handleSubmit(createCampus)}
               >
-                Salvar campus
-              </button>
-            </form>
+                <FormInput<CampusFormValues>
+                  name="name"
+                  label="Nome"
+                  rules={{
+                    required: "Informe o nome do campus",
+                    validate: requiredTrimmed("Informe o nome do campus"),
+                  }}
+                />
+                <FormTextarea<CampusFormValues>
+                  name="description"
+                  label="Descricao"
+                />
+                <button
+                  type="submit"
+                  className={cn(buttonVariants({ variant: "default", size: "lg" }))}
+                >
+                  Salvar campus
+                </button>
+              </form>
+            </FormProvider>
           </CardContent>
         </Card>
 

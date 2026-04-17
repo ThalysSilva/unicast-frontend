@@ -4,13 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 
+import { FormEmailInput, FormInput } from "@/components/forms/form-fields";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
 import { apiRequest } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -26,11 +25,11 @@ type FormValues = z.infer<typeof schema>;
 export default function RegisterPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  const form = useForm<FormValues>({ resolver: zodResolver(schema) });
   const {
-    register,
     handleSubmit,
     formState: { isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+  } = form;
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -62,31 +61,27 @@ export default function RegisterPage() {
             Use seu email institucional para acessar o painel.
           </p>
         </div>
-        <form
-          className="mt-6 flex flex-col gap-5"
-          onSubmit={handleSubmit(onSubmit)}
-        >
-          <div className="space-y-2">
-            <Label htmlFor="name">Nome</Label>
-            <Input id="name" placeholder="Prof. Nome" {...register("name")} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="prof@escola.com"
-              {...register("email")}
+        <FormProvider {...form}>
+          <form
+            className="mt-6 flex flex-col gap-5"
+            onSubmit={handleSubmit(onSubmit)}
+          >
+            <FormInput<FormValues>
+              name="name"
+              label="Nome"
+              placeholder="Prof. Nome"
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Senha</Label>
-            <Input id="password" type="password" {...register("password")} />
-          </div>
-          <Button type="submit" size="lg" disabled={isSubmitting}>
-            {isSubmitting ? "Criando..." : "Criar conta"}
-          </Button>
-        </form>
+            <FormEmailInput<FormValues>
+              name="email"
+              label="Email"
+              placeholder="prof@escola.com"
+            />
+            <FormInput<FormValues> name="password" label="Senha" type="password" />
+            <Button type="submit" size="lg" disabled={isSubmitting}>
+              {isSubmitting ? "Criando..." : "Criar conta"}
+            </Button>
+          </form>
+        </FormProvider>
         <div className="mt-6 text-center text-sm text-muted-foreground">
           Ja tem conta?{" "}
           <Link

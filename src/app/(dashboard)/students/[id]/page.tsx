@@ -2,24 +2,23 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { FormProvider, useForm } from "react-hook-form";
 
+import {
+  FormEmailInput,
+  FormInput,
+  FormPhoneInput,
+  FormSelect,
+  FormTextarea,
+} from "@/components/forms/form-fields";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValueFromOptions,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -28,7 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
@@ -38,13 +36,14 @@ import {
 } from "@/lib/academic-structure";
 import { apiRequest, extractData } from "@/lib/api";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
-import {
-  formatInternationalPhoneInput,
-  normalizePhone,
-  phoneExample,
-} from "@/lib/phone";
+import { normalizePhone } from "@/lib/phone";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
+import {
+  optionalEmailRules,
+  optionalPhoneRules,
+  requiredTrimmed,
+} from "@/lib/validation";
 import type {
   ApiMessage,
   ApiResponse,
@@ -97,7 +96,7 @@ const nullableValue = (value: string) => {
 export default function StudentDetailPage() {
   const params = useParams<{ id: string }>();
   const studentId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const [form, setForm] = useState<StudentForm>(emptyForm);
+  const form = useForm<StudentForm>({ defaultValues: emptyForm() });
   const { showToast } = useToast();
 
   const studentQuery = useApiQuery({
@@ -204,17 +203,12 @@ export default function StudentDetailPage() {
 
   useEffect(() => {
     if (student) {
-      setForm(formFromStudent(student));
+      form.reset(formFromStudent(student));
     }
-  }, [student]);
+  }, [form, student]);
 
-  const updateField = (field: keyof StudentForm, value: string) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
-
-  const handleSave = async () => {
-    await updateStudentMutation.mutateAsync(form);
-  };
+  const handleSave = async (values: StudentForm) =>
+    updateStudentMutation.mutateAsync(values);
 
   if (studentQuery.isLoading) {
     return <LoadingState label="Carregando cadastro do aluno..." />;
@@ -277,98 +271,62 @@ export default function StudentDetailPage() {
             Essas informações são compartilhadas por todos os vínculos do aluno.
           </p>
 
-          <div className="mt-5 grid gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="student-name">Nome</Label>
-              <Input
-                id="student-name"
-                value={form.name}
+          <FormProvider {...form}>
+            <form
+              className="mt-5 grid gap-4"
+              onSubmit={form.handleSubmit(handleSave)}
+            >
+              <FormInput<StudentForm>
+                name="name"
+                label="Nome"
                 disabled={updateStudentMutation.isPending}
-                onChange={(event) => updateField("name", event.target.value)}
+                rules={{
+                  required: "Informe o nome do aluno",
+                  validate: requiredTrimmed("Informe o nome do aluno"),
+                }}
               />
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="student-email">Email</Label>
-                <Input
-                  id="student-email"
-                  type="email"
-                  value={form.email}
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormEmailInput<StudentForm>
+                  name="email"
+                  label="Email"
                   disabled={updateStudentMutation.isPending}
-                  onChange={(event) => updateField("email", event.target.value)}
+                  rules={optionalEmailRules()}
+                />
+                <FormPhoneInput<StudentForm>
+                  name="phone"
+                  label="Telefone"
+                  disabled={updateStudentMutation.isPending}
+                  rules={optionalPhoneRules()}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="student-phone">Telefone</Label>
-                <Input
-                  id="student-phone"
-                  inputMode="tel"
-                  placeholder={phoneExample}
-                  value={form.phone}
-                  disabled={updateStudentMutation.isPending}
-                  onChange={(event) =>
-                    updateField(
-                      "phone",
-                      formatInternationalPhoneInput(event.target.value)
-                    )
-                  }
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Status acadêmico</Label>
-              <Select
-                value={form.status}
-                onValueChange={(value) =>
-                  updateField("status", (value ?? "PENDING") as StudentStatus)
-                }
-              >
-                <SelectTrigger disabled={updateStudentMutation.isPending}>
-                  <SelectValueFromOptions
-                    placeholder="Selecione"
-                    options={statusOptions}
-                    value={form.status}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      {status.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="student-annotation">Observação</Label>
-              <Textarea
-                id="student-annotation"
+              <FormSelect<StudentForm>
+                name="status"
+                label="Status acadêmico"
+                disabled={updateStudentMutation.isPending}
+                options={statusOptions}
+                rules={{ required: "Informe o status acadêmico" }}
+              />
+              <FormTextarea<StudentForm>
+                name="annotation"
+                label="Observação"
                 rows={4}
-                value={form.annotation}
                 disabled={updateStudentMutation.isPending}
-                onChange={(event) =>
-                  updateField("annotation", event.target.value)
-                }
               />
-            </div>
-            <div className="flex flex-wrap justify-between gap-3">
-              <Link
-                href="/students"
-                className={cn(buttonVariants({ variant: "ghost" }))}
-              >
-                Voltar
-              </Link>
-              <Button
-                type="button"
-                disabled={updateStudentMutation.isPending}
-                onClick={handleSave}
-              >
-                {updateStudentMutation.isPending
-                  ? "Salvando..."
-                  : "Salvar cadastro"}
-              </Button>
-            </div>
-          </div>
+              <div className="flex flex-wrap justify-between gap-3">
+                <Link
+                  href="/students"
+                  className={cn(buttonVariants({ variant: "ghost" }))}
+                >
+                  Voltar
+                </Link>
+                <Button type="submit" disabled={updateStudentMutation.isPending}>
+                  {updateStudentMutation.isPending
+                    ? "Salvando..."
+                    : "Salvar cadastro"}
+                </Button>
+              </div>
+            </form>
+          </FormProvider>
         </Card>
 
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">

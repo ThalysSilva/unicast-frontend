@@ -3,30 +3,36 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 
+import { FormInput, FormTextarea } from "@/components/forms/form-fields";
 import { AcademicBreadcrumb } from "@/components/layout/academic-breadcrumb";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
-import { Textarea } from "@/components/ui/textarea";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest } from "@/lib/api";
 import { loadAcademicStructure } from "@/lib/academic-structure";
 import { cn } from "@/lib/utils";
+import { requiredTrimmed } from "@/lib/validation";
 import type { ApiMessage } from "@/lib/types";
+
+type DisciplineFormValues = {
+  name: string;
+  description: string;
+  year: number;
+  semester: number;
+};
 
 export default function ProgramDetailPage() {
   const params = useParams<{ id: string }>();
   const programId = Array.isArray(params.id) ? params.id[0] : params.id;
   const { showToast } = useToast();
 
-  const form = useForm({
+  const form = useForm<DisciplineFormValues>({
     defaultValues: {
       name: "",
       description: "",
@@ -52,12 +58,7 @@ export default function ProgramDetailPage() {
     [programId, structureQuery.data?.disciplines]
   );
 
-  const createDiscipline = async (values: {
-    name: string;
-    description: string;
-    year: number;
-    semester: number;
-  }) => {
+  const createDiscipline = async (values: DisciplineFormValues) => {
     const res = await apiRequest<ApiMessage>("/discipline", {
       method: "POST",
       body: {
@@ -138,43 +139,55 @@ export default function ProgramDetailPage() {
             </p>
           </CardHeader>
           <CardContent className="px-6 py-6">
-            <form
-              className="flex flex-col gap-4"
-              onSubmit={form.handleSubmit(createDiscipline)}
-            >
-              <div className="space-y-2">
-                <Label htmlFor="discipline-name">Nome</Label>
-                <Input id="discipline-name" {...form.register("name")} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="discipline-desc">Descricao</Label>
-                <Textarea id="discipline-desc" {...form.register("description")} />
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="discipline-year">Ano</Label>
-                  <Input
-                    id="discipline-year"
-                    type="number"
-                    {...form.register("year", { valueAsNumber: true })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="discipline-sem">Semestre</Label>
-                  <Input
-                    id="discipline-sem"
-                    type="number"
-                    {...form.register("semester", { valueAsNumber: true })}
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                className={cn(buttonVariants({ variant: "default", size: "lg" }))}
+            <FormProvider {...form}>
+              <form
+                className="flex flex-col gap-4"
+                onSubmit={form.handleSubmit(createDiscipline)}
               >
-                Salvar disciplina
-              </button>
-            </form>
+                <FormInput<DisciplineFormValues>
+                  name="name"
+                  label="Nome"
+                  rules={{
+                    required: "Informe o nome da disciplina",
+                    validate: requiredTrimmed("Informe o nome da disciplina"),
+                  }}
+                />
+                <FormTextarea<DisciplineFormValues>
+                  name="description"
+                  label="Descricao"
+                />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <FormInput<DisciplineFormValues>
+                    name="year"
+                    label="Ano"
+                    type="number"
+                    parseValue={(value) => Number(value)}
+                    rules={{
+                      required: "Informe o ano",
+                      min: { value: 2000, message: "Ano inválido" },
+                      max: { value: 3000, message: "Ano inválido" },
+                    }}
+                  />
+                  <FormInput<DisciplineFormValues>
+                    name="semester"
+                    label="Semestre"
+                    type="number"
+                    parseValue={(value) => Number(value)}
+                    rules={{
+                      required: "Informe o semestre",
+                      min: { value: 1, message: "Semestre inválido" },
+                      max: { value: 2, message: "Semestre inválido" },
+                    }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className={cn(buttonVariants({ variant: "default", size: "lg" }))}
+                >
+                  Salvar disciplina
+                </button>
+              </form>
+            </FormProvider>
           </CardContent>
         </Card>
 

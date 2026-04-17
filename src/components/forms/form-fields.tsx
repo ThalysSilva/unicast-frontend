@@ -94,6 +94,7 @@ export function FormInput<T extends FieldValues>({
   parseValue,
   id,
   onChange,
+  onBlur,
   ...props
 }: FormInputProps<T>) {
   const {
@@ -118,7 +119,10 @@ export function FormInput<T extends FieldValues>({
             ref={field.ref}
             name={field.name}
             value={field.value ?? ""}
-            onBlur={field.onBlur}
+            onBlur={(event) => {
+              field.onBlur();
+              onBlur?.(event);
+            }}
             onChange={(event) => {
               const value = formatValue
                 ? formatValue(event.target.value)
