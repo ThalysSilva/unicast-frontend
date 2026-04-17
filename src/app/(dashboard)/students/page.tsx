@@ -8,6 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -317,10 +325,62 @@ export default function StudentsPage() {
           </Card>
 
           <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-            <h2 className="text-lg font-semibold">Importar matriculas</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Envie um CSV com `studentId` obrigatorio para carga inicial ou atualizações maiores da turma.
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Importar matriculas</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Envie um CSV com `studentId` obrigatorio para carga inicial ou atualizações maiores da turma.
+                </p>
+              </div>
+              <Dialog>
+                <DialogTrigger render={<Button type="button" variant="outline" size="sm" />}>
+                  Como montar o CSV
+                </DialogTrigger>
+                <DialogContent className="max-h-[calc(100dvh-2rem)] w-[min(720px,calc(100vw-2rem))] max-w-none overflow-y-auto sm:max-w-none">
+                  <DialogHeader>
+                    <DialogTitle>Como montar o CSV</DialogTitle>
+                    <DialogDescription>
+                      Use a primeira linha como cabeçalho. A coluna `studentId` é obrigatória.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid min-w-0 gap-4 text-sm">
+                    <div className="rounded-2xl border border-border/60 bg-background p-4">
+                      <p className="font-medium">Colunas aceitas</p>
+                      <div className="mt-3 grid gap-2 text-muted-foreground">
+                        <p><span className="font-medium text-foreground">studentId</span>: matrícula institucional do aluno. Obrigatória.</p>
+                        <p><span className="font-medium text-foreground">name</span>: nome do aluno. Opcional.</p>
+                        <p><span className="font-medium text-foreground">phone</span>: telefone cru com DDI, DDD e número. Opcional.</p>
+                        <p><span className="font-medium text-foreground">email</span>: email do aluno. Opcional.</p>
+                        <p><span className="font-medium text-foreground">status</span>: opcional. Em branco vira PENDING.</p>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-background p-4">
+                      <p className="font-medium">Status aceitos</p>
+                      <div className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
+                        <p><span className="font-medium text-foreground">1</span> ou ACTIVE: ativo</p>
+                        <p><span className="font-medium text-foreground">2</span> ou LOCKED/TRANCADO: trancado</p>
+                        <p><span className="font-medium text-foreground">3</span> ou GRADUATED/CONCLUIDO: graduado</p>
+                        <p><span className="font-medium text-foreground">4</span> ou CANCELED/CANCELADO: cancelado</p>
+                        <p><span className="font-medium text-foreground">5</span>, PENDING/PENDENTE ou vazio: pendente</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-2 font-medium">Exemplo</p>
+                      <pre className="max-w-full overflow-x-auto rounded-2xl border border-border/60 bg-muted p-4 text-xs leading-relaxed">
+{`studentId,name,phone,email,status
+112233,Thalys Farias,5511999999999,thalys@email.com,1
+445566,Ana Silva,5521988887777,ana@email.com,5`}
+                      </pre>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-background p-4 text-muted-foreground">
+                      <p>
+                        Em `Atualizar ou inserir`, o sistema cria alunos novos e vincula alunos existentes à disciplina. Em `Substituir lista`, os vínculos atuais da disciplina são limpos antes da importação.
+                      </p>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
             <div className="mt-4 flex flex-col gap-4">
               <div className="space-y-2">
                 <Label>Disciplina</Label>
