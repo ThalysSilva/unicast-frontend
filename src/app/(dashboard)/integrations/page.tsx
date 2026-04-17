@@ -441,19 +441,23 @@ export default function IntegrationsPage() {
                 {smtp.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background px-4 py-3"
+                    className="grid items-center gap-3 rounded-2xl border border-border/60 bg-background px-4 py-3 sm:grid-cols-[minmax(0,1fr)_92px_auto]"
                   >
                     <div className="min-w-0">
-                      <p className="font-medium text-foreground">{item.email}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="truncate font-medium text-foreground">
+                        {item.email}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
                         {item.authMode === "oauth"
                           ? "Google OAuth"
                           : `${item.host}:${item.port}`}
                       </p>
                     </div>
-                    <Badge variant="outline">
-                      {item.authMode === "oauth" ? "OAuth" : "Senha"}
-                    </Badge>
+                    <div className="flex items-center sm:justify-center">
+                      <Badge variant="outline" className="min-w-16 justify-center">
+                        {item.authMode === "oauth" ? "OAuth" : "Senha"}
+                      </Badge>
+                    </div>
                     <Button
                       size="sm"
                       variant="destructive"
