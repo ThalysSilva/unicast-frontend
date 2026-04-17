@@ -58,6 +58,11 @@ const statusFilters: Array<StudentStatus | "ALL"> = [
   "GRADUATED",
 ];
 
+const importModeOptions = [
+  { value: "upsert", label: "Atualizar ou inserir" },
+  { value: "clean", label: "Substituir lista" },
+];
+
 export default function StudentsPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StudentStatus | "ALL">("ALL");
@@ -346,11 +351,18 @@ export default function StudentsPage() {
                   onValueChange={(value) => setImportMode(value ?? "upsert")}
                 >
                   <SelectTrigger disabled={importStudentsMutation.isPending}>
-                    <SelectValue placeholder="Modo" />
+                    <SelectValueFromOptions
+                      placeholder="Modo"
+                      options={importModeOptions}
+                      value={importMode}
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="upsert">Atualizar ou inserir</SelectItem>
-                    <SelectItem value="clean">Substituir lista</SelectItem>
+                    {importModeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
