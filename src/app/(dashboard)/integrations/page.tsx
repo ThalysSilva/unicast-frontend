@@ -523,7 +523,7 @@ export default function IntegrationsPage() {
                     <TableRow key={item.id}>
                       <TableCell>
                         <div className="flex flex-col gap-2">
-                          <span>{item.instanceName ?? item.id}</span>
+                          <span>{item.phone || item.id}</span>
                           {CONNECTED_STATUSES.has(
                             normalizeConnectionStatus(item.connectionStatus)
                           ) ? (
@@ -536,7 +536,11 @@ export default function IntegrationsPage() {
                           ) : null}
                         </div>
                       </TableCell>
-                      <TableCell>{item.phone}</TableCell>
+                      <TableCell>
+                        <span className="text-xs text-muted-foreground">
+                          {item.instanceName ?? "-"}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex flex-wrap justify-end gap-2">
                           {!CONNECTED_STATUSES.has(

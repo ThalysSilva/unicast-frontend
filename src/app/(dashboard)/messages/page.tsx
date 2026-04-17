@@ -365,7 +365,7 @@ export default function MessagesPage() {
   }));
   const whatsappOptions = whatsapp.map((item) => ({
     value: item.id,
-    label: item.instanceName ?? item.phone,
+    label: item.phone || item.instanceName || item.id,
   }));
   const hasScope = selectedScopeDisciplineIds.length > 0;
   const campusDisciplines = (campusId: string) =>
@@ -747,7 +747,7 @@ export default function MessagesPage() {
                   <SelectContent>
                     {whatsapp.map((item) => (
                       <SelectItem key={item.id} value={item.id}>
-                        {item.instanceName ?? item.phone}
+                        {item.phone || item.instanceName || item.id}
                       </SelectItem>
                     ))}
                   </SelectContent>
