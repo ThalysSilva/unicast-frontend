@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 
+import {
+  FormInput,
+  FormSelect,
+  FormTextarea,
+} from "@/components/forms/form-fields";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,14 +26,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValueFromOptions,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
@@ -39,6 +36,7 @@ import {
 import { apiRequest, extractData, getAuth } from "@/lib/api";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
+import { requiredTrimmed } from "@/lib/validation";
 import type {
   ApiMessage,
   ApiResponse,
@@ -125,6 +123,13 @@ const formatAudienceList = (items: string[]) => {
 const sameSelection = (a: string[], b: string[]) =>
   a.length === b.length && a.every((item, index) => item === b[index]);
 
+type MessageFormValues = {
+  subject: string;
+  body: string;
+  smtp_id: string;
+  whatsapp_id: string;
+};
+
 export default function MessagesPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [selectedCampusIds, setSelectedCampusIds] = useState<string[]>([]);
@@ -134,7 +139,7 @@ export default function MessagesPage() {
   const [recipientSearch, setRecipientSearch] = useState("");
   const { showToast } = useToast();
 
-  const form = useForm({
+  const form = useForm<MessageFormValues>({
     defaultValues: {
       subject: "",
       body: "",
@@ -241,12 +246,7 @@ export default function MessagesPage() {
 
   const sendMessageMutation = useApiMutation<
     ApiMessage,
-    {
-      subject: string;
-      body: string;
-      smtp_id: string;
-      whatsapp_id: string;
-    }
+    MessageFormValues
   >({
     mutationFn: async (values) => {
       const auth = getAuth();
@@ -357,8 +357,6 @@ export default function MessagesPage() {
       whatsappQuery.error,
     ]
   );
-  const smtpId = useWatch({ control: form.control, name: "smtp_id" });
-  const whatsappId = useWatch({ control: form.control, name: "whatsapp_id" });
   const smtpOptions = smtp.map((item) => ({
     value: item.id,
     label: item.email,
@@ -404,12 +402,7 @@ export default function MessagesPage() {
     ? `${selectedScopeDisciplineIds.length} disciplina(s), ${selectedCampusCount} campus, ${students.length} aluno(s)`
     : "Nenhum filtro selecionado";
 
-  const handleSend = async (values: {
-    subject: string;
-    body: string;
-    smtp_id: string;
-    whatsapp_id: string;
-  }) => {
+  const handleSend = async (values: MessageFormValues) => {
     if (!validSelected.length) {
       showToast({ title: "Selecione ao menos um aluno", variant: "error" });
       return;
@@ -700,88 +693,56 @@ export default function MessagesPage() {
 
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
           <h2 className="text-lg font-semibold">Configurar envio</h2>
-          <form
-            className="mt-4 flex flex-col gap-4"
-            onSubmit={form.handleSubmit(handleSend)}
-          >
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Select
-                  value={smtpId}
-                  onValueChange={(value) =>
-                    form.setValue("smtp_id", value ?? "")
-                  }
-                >
-                  <SelectTrigger disabled={isLoading || sendMessageMutation.isPending}>
-                    <SelectValueFromOptions
-                      placeholder="Selecione"
-                      options={smtpOptions}
-                      value={smtpId}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {smtp.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          <FormProvider {...form}>
+            <form
+              className="mt-4 flex flex-col gap-4"
+              onSubmit={form.handleSubmit(handleSend)}
+            >
+              <div className="grid gap-3 md:grid-cols-2">
+                <FormSelect<MessageFormValues>
+                  name="smtp_id"
+                  label="Email"
+                  disabled={isLoading || sendMessageMutation.isPending}
+                  options={smtpOptions}
+                />
+                <FormSelect<MessageFormValues>
+                  name="whatsapp_id"
+                  label="WhatsApp"
+                  disabled={isLoading || sendMessageMutation.isPending}
+                  options={whatsappOptions}
+                />
               </div>
-              <div className="space-y-2">
-                <Label>WhatsApp</Label>
-                <Select
-                  value={whatsappId}
-                  onValueChange={(value) =>
-                    form.setValue("whatsapp_id", value ?? "")
-                  }
-                >
-                  <SelectTrigger disabled={isLoading || sendMessageMutation.isPending}>
-                    <SelectValueFromOptions
-                      placeholder="Selecione"
-                      options={whatsappOptions}
-                      value={whatsappId}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {whatsapp.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.phone ? formatPhone(item.phone) : item.instanceName || item.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="msg-subject">Assunto</Label>
-              <Input
-                id="msg-subject"
+              <FormInput<MessageFormValues>
+                name="subject"
+                label="Assunto"
                 disabled={sendMessageMutation.isPending}
-                {...form.register("subject")}
+                rules={{
+                  required: "Informe o assunto da mensagem",
+                  validate: requiredTrimmed("Informe o assunto da mensagem"),
+                }}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="msg-body">Mensagem</Label>
-              <Textarea
-                id="msg-body"
+              <FormTextarea<MessageFormValues>
+                name="body"
+                label="Mensagem"
                 rows={5}
                 disabled={sendMessageMutation.isPending}
-                {...form.register("body")}
+                rules={{
+                  required: "Escreva a mensagem",
+                  validate: requiredTrimmed("Escreva a mensagem"),
+                }}
               />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-              {selectedCount} aluno(s) selecionado(s)
-              </span>
-              <Button type="submit" disabled={isLoading || sendMessageMutation.isPending}>
-                {sendMessageMutation.isPending
-                  ? "Enviando..."
-                  : "Enviar mensagem"}
-              </Button>
-            </div>
-          </form>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {selectedCount} aluno(s) selecionado(s)
+                </span>
+                <Button type="submit" disabled={isLoading || sendMessageMutation.isPending}>
+                  {sendMessageMutation.isPending
+                    ? "Enviando..."
+                    : "Enviar mensagem"}
+                </Button>
+              </div>
+            </form>
+          </FormProvider>
         </Card>
       </section>
     </div>

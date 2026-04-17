@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 
+import {
+  FormEmailInput,
+  FormInput,
+  FormPhoneInput,
+} from "@/components/forms/form-fields";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,8 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
   Table,
@@ -32,7 +35,6 @@ import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData, getAuth } from "@/lib/api";
 import { formatPhone } from "@/lib/format";
 import {
-  formatInternationalPhoneInput,
   isValidInternationalPhone,
   normalizePhone,
   normalizePhoneDigits,
@@ -45,6 +47,7 @@ import type {
   SmtpInstance,
   WhatsappInstance,
 } from "@/lib/types";
+import { emailRules, phoneRules } from "@/lib/validation";
 
 type ConnectResponse = {
   status?: string;
@@ -64,6 +67,15 @@ type CreateWhatsappResponse = {
 };
 
 type OAuthStartResponse = ApiResponse<{ url: string }>;
+type SmtpFormValues = {
+  host: string;
+  port: number;
+  email: string;
+  password: string;
+};
+type WhatsappFormValues = {
+  phone: string;
+};
 
 const CONNECTED_STATUSES = new Set(["open", "connected"]);
 
@@ -98,7 +110,7 @@ export default function IntegrationsPage() {
     window.history.replaceState({}, "", nextURL);
   }, [showToast]);
 
-  const smtpForm = useForm({
+  const smtpForm = useForm<SmtpFormValues>({
     defaultValues: {
       host: "",
       port: 587,
@@ -107,7 +119,7 @@ export default function IntegrationsPage() {
     },
   });
 
-  const whatsappForm = useForm({
+  const whatsappForm = useForm<WhatsappFormValues>({
     defaultValues: { phone: "" },
   });
 
@@ -392,65 +404,63 @@ export default function IntegrationsPage() {
               </Button>
             </div>
           </div>
-          <form
-            className="mt-4 flex flex-col gap-4"
-            onSubmit={smtpForm.handleSubmit((values) =>
-              createSmtpMutation.mutateAsync(values)
-            )}
-          >
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="smtp-host">Host</Label>
-                <Input
-                  id="smtp-host"
+          <FormProvider {...smtpForm}>
+            <form
+              className="mt-4 flex flex-col gap-4"
+              onSubmit={smtpForm.handleSubmit((values) =>
+                createSmtpMutation.mutateAsync(values)
+              )}
+            >
+              <div className="grid gap-3 md:grid-cols-2">
+                <FormInput<SmtpFormValues>
+                  name="host"
+                  label="Host"
                   disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
-                  {...smtpForm.register("host")}
+                  rules={{ required: "Informe o host do email" }}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="smtp-port">Porta</Label>
-                <Input
-                  id="smtp-port"
+                <FormInput<SmtpFormValues>
+                  name="port"
+                  label="Porta"
                   type="number"
                   disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
-                  {...smtpForm.register("port", { valueAsNumber: true })}
+                  parseValue={(value) => Number(value)}
+                  rules={{
+                    required: "Informe a porta",
+                    min: { value: 1, message: "Porta inválida" },
+                    max: { value: 65535, message: "Porta inválida" },
+                  }}
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="smtp-email">Email</Label>
-                <Input
-                  id="smtp-email"
-                  type="email"
-                  disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
-                  {...smtpForm.register("email")}
-                />
-              </div>
-            <div className="space-y-2">
-              <Label htmlFor="smtp-pass">Senha</Label>
-                <Input
-                  id="smtp-pass"
-                  type="password"
-                  disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
-                  {...smtpForm.register("password")}
-                />
-              </div>
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
+              <FormEmailInput<SmtpFormValues>
+                name="email"
+                label="Email"
                 disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
-                onClick={smtpForm.handleSubmit((values) =>
-                  testSmtpMutation.mutateAsync(values)
-                )}
-              >
-                {testSmtpMutation.isPending ? "Testando..." : "Testar email"}
-              </Button>
-              <Button type="submit" disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}>
-                {createSmtpMutation.isPending ? "Salvando..." : "Salvar email"}
-              </Button>
-            </div>
-          </form>
+                rules={emailRules()}
+              />
+              <FormInput<SmtpFormValues>
+                name="password"
+                label="Senha"
+                type="password"
+                disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
+                rules={{ required: "Informe a senha" }}
+              />
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}
+                  onClick={smtpForm.handleSubmit((values) =>
+                    testSmtpMutation.mutateAsync(values)
+                  )}
+                >
+                  {testSmtpMutation.isPending ? "Testando..." : "Testar email"}
+                </Button>
+                <Button type="submit" disabled={createSmtpMutation.isPending || testSmtpMutation.isPending}>
+                  {createSmtpMutation.isPending ? "Salvando..." : "Salvar email"}
+                </Button>
+              </div>
+            </form>
+          </FormProvider>
           <div className="mt-4">
             {smtpQuery.isLoading ? (
               <LoadingState label="Carregando emails..." className="min-h-24" />
@@ -501,38 +511,26 @@ export default function IntegrationsPage() {
 
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
           <h2 className="text-lg font-semibold">WhatsApp</h2>
-          <form
-            className="mt-4 flex flex-col gap-4"
-            onSubmit={whatsappForm.handleSubmit(async (values) => {
-              setQrData(null);
-              setQrInstanceId(null);
-              await createWhatsappMutation.mutateAsync(values);
-            })}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="whatsapp-phone">Telefone</Label>
-              <Input
-                id="whatsapp-phone"
-                inputMode="tel"
-                placeholder={phoneExample}
+          <FormProvider {...whatsappForm}>
+            <form
+              className="mt-4 flex flex-col gap-4"
+              onSubmit={whatsappForm.handleSubmit(async (values) => {
+                setQrData(null);
+                setQrInstanceId(null);
+                await createWhatsappMutation.mutateAsync(values);
+              })}
+            >
+              <FormPhoneInput<WhatsappFormValues>
+                name="phone"
+                label="Telefone"
                 disabled={createWhatsappMutation.isPending}
-                {...whatsappForm.register("phone", {
-                  onChange: (event) =>
-                    whatsappForm.setValue(
-                      "phone",
-                      formatInternationalPhoneInput(event.target.value),
-                      { shouldDirty: true, shouldValidate: true }
-                    ),
-                })}
+                rules={phoneRules()}
               />
-              <p className="text-xs text-muted-foreground">
-                Use DDI, DDD e número. Exemplo: {phoneExample}.
-              </p>
-            </div>
-            <Button type="submit" disabled={createWhatsappMutation.isPending}>
-              {createWhatsappMutation.isPending ? "Criando..." : "Criar instancia"}
-            </Button>
-          </form>
+              <Button type="submit" disabled={createWhatsappMutation.isPending}>
+                {createWhatsappMutation.isPending ? "Criando..." : "Criar instancia"}
+              </Button>
+            </form>
+          </FormProvider>
           <div className="mt-4 max-h-[420px] overflow-auto rounded-2xl border border-border/60">
             {isLoading ? (
               <LoadingState

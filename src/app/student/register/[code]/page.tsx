@@ -1,28 +1,36 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 
+import {
+  FormCheckbox,
+  FormEmailInput,
+  FormInput,
+  FormPhoneInput,
+} from "@/components/forms/form-fields";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
 import { apiRequest } from "@/lib/api";
-import {
-  formatInternationalPhoneInput,
-  normalizePhone,
-  phoneExample,
-} from "@/lib/phone";
+import { normalizePhone } from "@/lib/phone";
 import type { ApiMessage } from "@/lib/types";
+import { emailRules, phoneRules } from "@/lib/validation";
+
+type StudentRegisterForm = {
+  studentId: string;
+  name: string;
+  email: string;
+  phone: string;
+  consent: boolean;
+};
 
 export default function StudentRegisterPage() {
   const params = useParams();
   const code = params?.code as string;
   const { showToast } = useToast();
 
-  const form = useForm({
+  const form = useForm<StudentRegisterForm>({
     defaultValues: {
       studentId: "",
       name: "",
@@ -32,13 +40,7 @@ export default function StudentRegisterPage() {
     },
   });
 
-  const handleSubmit = async (values: {
-    studentId: string;
-    name?: string;
-    email?: string;
-    phone?: string;
-    consent: boolean;
-  }) => {
+  const handleSubmit = async (values: StudentRegisterForm) => {
     try {
       const res = await apiRequest<ApiMessage>(
         `/invite/self-register/${code}`,
@@ -75,60 +77,43 @@ export default function StudentRegisterPage() {
             Se sua matricula ja foi registrada pelo professor, preencha os dados abaixo para liberar os comunicados por email e WhatsApp.
           </p>
         </div>
-        <form
-          className="mt-6 flex flex-col gap-5"
-          onSubmit={form.handleSubmit(handleSubmit)}
-        >
-          <div className="space-y-2">
-            <Label htmlFor="studentId">Matricula</Label>
-            <Input id="studentId" {...form.register("studentId")} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="name">Nome</Label>
-            <Input id="name" {...form.register("name")} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" {...form.register("email")} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Telefone</Label>
-            <Input
-              id="phone"
-              inputMode="tel"
-              placeholder={phoneExample}
-              {...form.register("phone", {
-                onChange: (event) =>
-                  form.setValue(
-                    "phone",
-                    formatInternationalPhoneInput(event.target.value),
-                    { shouldDirty: true, shouldValidate: true }
-                  ),
-              })}
+        <FormProvider {...form}>
+          <form
+            className="mt-6 flex flex-col gap-5"
+            onSubmit={form.handleSubmit(handleSubmit)}
+          >
+            <FormInput<StudentRegisterForm>
+              name="studentId"
+              label="Matricula"
+              rules={{ required: "Informe a matrícula" }}
             />
-            <p className="text-xs text-muted-foreground">
-              Use DDI, DDD e número. Exemplo: {phoneExample}.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
-            <label className="flex items-start gap-3 text-sm text-muted-foreground">
-              <Checkbox
-                checked={form.watch("consent")}
-                onCheckedChange={(checked) =>
-                  form.setValue("consent", checked === true, {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  })
-                }
-                className="mt-0.5"
-              />
-              <span>
-                Aceito receber comunicados automatizados desta disciplina por email e WhatsApp para fins acadêmicos.
-              </span>
-            </label>
-          </div>
-          <Button type="submit">Ativar meus contatos</Button>
-        </form>
+            <FormInput<StudentRegisterForm>
+              name="name"
+              label="Nome"
+              rules={{ required: "Informe seu nome" }}
+            />
+            <FormEmailInput<StudentRegisterForm>
+              name="email"
+              label="Email"
+              rules={emailRules("Informe seu email")}
+            />
+            <FormPhoneInput<StudentRegisterForm>
+              name="phone"
+              label="Telefone"
+              rules={phoneRules("Informe seu telefone")}
+            />
+            <FormCheckbox<StudentRegisterForm>
+              name="consent"
+              label="Aceito receber comunicados automatizados desta disciplina por email e WhatsApp para fins acadêmicos."
+              rules={{
+                validate: (value) =>
+                  value === true ||
+                  "É necessário aceitar o recebimento de comunicados",
+              }}
+            />
+            <Button type="submit">Ativar meus contatos</Button>
+          </form>
+        </FormProvider>
       </Card>
     </div>
   );
