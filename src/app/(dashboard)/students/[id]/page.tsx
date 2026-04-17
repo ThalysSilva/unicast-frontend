@@ -38,6 +38,11 @@ import {
 } from "@/lib/academic-structure";
 import { apiRequest, extractData } from "@/lib/api";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
+import {
+  formatInternationalPhoneInput,
+  normalizePhone,
+  phoneExample,
+} from "@/lib/phone";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import type {
@@ -143,7 +148,7 @@ export default function StudentDetailPage() {
         body: {
           name: nullableValue(values.name),
           email: nullableValue(values.email),
-          phone: nullableValue(values.phone),
+          phone: nullableValue(normalizePhone(values.phone)),
           annotation: nullableValue(values.annotation),
           status: values.status,
         },
@@ -297,9 +302,16 @@ export default function StudentDetailPage() {
                 <Label htmlFor="student-phone">Telefone</Label>
                 <Input
                   id="student-phone"
+                  inputMode="tel"
+                  placeholder={phoneExample}
                   value={form.phone}
                   disabled={updateStudentMutation.isPending}
-                  onChange={(event) => updateField("phone", event.target.value)}
+                  onChange={(event) =>
+                    updateField(
+                      "phone",
+                      formatInternationalPhoneInput(event.target.value)
+                    )
+                  }
                 />
               </div>
             </div>

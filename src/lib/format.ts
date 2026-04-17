@@ -1,4 +1,5 @@
 import type { StudentStatus } from "@/lib/types";
+import { formatInternationalPhoneInput } from "@/lib/phone";
 
 export const studentStatusLabel = (status?: StudentStatus) => {
   switch (status) {
@@ -19,5 +20,5 @@ export const studentStatusLabel = (status?: StudentStatus) => {
 
 export const formatPhone = (value?: string) => {
   if (!value) return "";
-  return value.replace(/(\d{2})(\d{4,5})(\d{4})/, "($1) $2-$3");
+  return formatInternationalPhoneInput(value);
 };

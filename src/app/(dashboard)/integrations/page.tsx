@@ -30,6 +30,14 @@ import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData, getAuth } from "@/lib/api";
+import { formatPhone } from "@/lib/format";
+import {
+  formatInternationalPhoneInput,
+  isValidInternationalPhone,
+  normalizePhone,
+  normalizePhoneDigits,
+  phoneExample,
+} from "@/lib/phone";
 import { queryKeys } from "@/lib/query-keys";
 import type {
   ApiMessage,
@@ -247,17 +255,27 @@ export default function IntegrationsPage() {
     ApiResponse<CreateWhatsappResponse>,
     { phone: string }
   >({
-    mutationFn: async (values) =>
-      apiRequest<ApiResponse<CreateWhatsappResponse>>("/whatsapp/instance", {
+    mutationFn: async (values) => {
+      const phone = normalizePhone(values.phone);
+
+      if (!isValidInternationalPhone(phone)) {
+        throw new Error(`Informe o telefone com DDI. Exemplo: ${phoneExample}`);
+      }
+
+      return apiRequest<ApiResponse<CreateWhatsappResponse>>("/whatsapp/instance", {
         method: "POST",
-        body: values,
-      }),
+        body: { phone },
+      });
+    },
     invalidateQueryKeys: [queryKeys.whatsapp()],
     onSuccess: async (res, values) => {
       handleSuccess(res.message ?? "Instancia criada");
       whatsappForm.reset();
       const instances = await syncWhatsappInstances();
-      const created = instances.find((item) => item.phone === values.phone);
+      const normalizedPhone = normalizePhoneDigits(values.phone);
+      const created = instances.find(
+        (item) => normalizePhoneDigits(item.phone) === normalizedPhone
+      );
 
       if (created?.id) {
         setQrInstanceId(created.id);
@@ -492,12 +510,24 @@ export default function IntegrationsPage() {
             })}
           >
             <div className="space-y-2">
-              <Label htmlFor="whatsapp-phone">Telefone (com DDI)</Label>
+              <Label htmlFor="whatsapp-phone">Telefone</Label>
               <Input
                 id="whatsapp-phone"
+                inputMode="tel"
+                placeholder={phoneExample}
                 disabled={createWhatsappMutation.isPending}
-                {...whatsappForm.register("phone")}
+                {...whatsappForm.register("phone", {
+                  onChange: (event) =>
+                    whatsappForm.setValue(
+                      "phone",
+                      formatInternationalPhoneInput(event.target.value),
+                      { shouldDirty: true, shouldValidate: true }
+                    ),
+                })}
               />
+              <p className="text-xs text-muted-foreground">
+                Use DDI, DDD e número. Exemplo: {phoneExample}.
+              </p>
             </div>
             <Button type="submit" disabled={createWhatsappMutation.isPending}>
               {createWhatsappMutation.isPending ? "Criando..." : "Criar instancia"}
@@ -523,7 +553,7 @@ export default function IntegrationsPage() {
                     <TableRow key={item.id}>
                       <TableCell>
                         <div className="flex flex-col gap-2">
-                          <span>{item.phone || item.id}</span>
+                          <span>{item.phone ? formatPhone(item.phone) : item.id}</span>
                           {CONNECTED_STATUSES.has(
                             normalizeConnectionStatus(item.connectionStatus)
                           ) ? (

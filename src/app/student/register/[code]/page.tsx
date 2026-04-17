@@ -10,6 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
 import { apiRequest } from "@/lib/api";
+import {
+  formatInternationalPhoneInput,
+  normalizePhone,
+  phoneExample,
+} from "@/lib/phone";
 import type { ApiMessage } from "@/lib/types";
 
 export default function StudentRegisterPage() {
@@ -39,7 +44,10 @@ export default function StudentRegisterPage() {
         `/invite/self-register/${code}`,
         {
           method: "POST",
-          body: values,
+          body: {
+            ...values,
+            phone: normalizePhone(values.phone ?? ""),
+          },
         }
       );
       showToast({ title: res.message ?? "Cadastro realizado", variant: "success" });
@@ -85,7 +93,22 @@ export default function StudentRegisterPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Telefone</Label>
-            <Input id="phone" {...form.register("phone")} />
+            <Input
+              id="phone"
+              inputMode="tel"
+              placeholder={phoneExample}
+              {...form.register("phone", {
+                onChange: (event) =>
+                  form.setValue(
+                    "phone",
+                    formatInternationalPhoneInput(event.target.value),
+                    { shouldDirty: true, shouldValidate: true }
+                  ),
+              })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Use DDI, DDD e número. Exemplo: {phoneExample}.
+            </p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
             <label className="flex items-start gap-3 text-sm text-muted-foreground">
