@@ -17,7 +17,7 @@ type InviteQrDialogProps = {
   code: string;
   link: string;
   campusName?: string;
-  courseName?: string;
+  disciplineName?: string;
 };
 
 const slugify = (value: string) =>
@@ -31,13 +31,13 @@ const slugify = (value: string) =>
 const buildFileName = ({
   code,
   campusName,
-  courseName,
+  disciplineName,
 }: {
   code: string;
   campusName?: string;
-  courseName?: string;
+  disciplineName?: string;
 }) => {
-  const parts = ["convite", campusName, courseName, code].filter(Boolean);
+  const parts = ["convite", campusName, disciplineName, code].filter(Boolean);
   return `${parts.map((part) => slugify(part ?? "")).join("-")}.png`;
 };
 
@@ -45,7 +45,7 @@ export function InviteQrDialog({
   code,
   link,
   campusName,
-  courseName,
+  disciplineName,
 }: InviteQrDialogProps) {
   const [open, setOpen] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState("");
@@ -69,7 +69,7 @@ export function InviteQrDialog({
 
     const anchor = document.createElement("a");
     anchor.href = qrDataUrl;
-    anchor.download = buildFileName({ code, campusName, courseName });
+    anchor.download = buildFileName({ code, campusName, disciplineName });
     anchor.click();
   };
 

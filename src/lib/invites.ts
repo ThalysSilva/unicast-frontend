@@ -1,6 +1,6 @@
 export type InvitePayload = {
   id: string;
-  courseId: string;
+  disciplineId: string;
   code: string;
   expiresAt?: string | null;
   active: boolean;
@@ -22,4 +22,3 @@ export const formatInviteExpiration = (expiresAt?: string | null) => {
     timeStyle: "short",
   }).format(new Date(expiresAt));
 };
-

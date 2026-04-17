@@ -49,21 +49,21 @@ export default function DashboardPage() {
         apiRequest<ApiResponse<Student[]>>("/student"),
       ]);
 
-      const courseStudentResults = await Promise.allSettled(
-        structure.courses.map((course) =>
-          apiRequest<ApiResponse<Student[]>>(`/student?course=${course.id}`)
+      const disciplineStudentResults = await Promise.allSettled(
+        structure.disciplines.map((discipline) =>
+          apiRequest<ApiResponse<Student[]>>(`/student?discipline=${discipline.id}`)
         )
       );
 
-      const studentsByCourse = Object.fromEntries(
-        structure.courses.map((course, index) => {
-          const result = courseStudentResults[index];
-          const courseStudents =
+      const studentsByDiscipline = Object.fromEntries(
+        structure.disciplines.map((discipline, index) => {
+          const result = disciplineStudentResults[index];
+          const disciplineStudents =
             result.status === "fulfilled" ? extractData(result.value) : [];
 
           return [
-            course.id,
-            toStudentArray(courseStudents),
+            discipline.id,
+            toStudentArray(disciplineStudents),
           ];
         })
       );
@@ -71,46 +71,46 @@ export default function DashboardPage() {
       return {
         ...structure,
         students: extractData(studentRes),
-        studentsByCourse,
+        studentsByDiscipline,
       };
     },
   });
 
   const campuses = summaryQuery.data?.campuses ?? [];
   const programs = summaryQuery.data?.programs ?? [];
-  const courses = summaryQuery.data?.courses ?? [];
+  const disciplines = summaryQuery.data?.disciplines ?? [];
   const students = summaryQuery.data?.students ?? [];
-  const studentsByCourse = summaryQuery.data?.studentsByCourse ?? {};
-  const coursesWithStats = courses.map((course) => {
-    const courseStudents = toStudentArray(studentsByCourse[course.id]);
+  const studentsByDiscipline = summaryQuery.data?.studentsByDiscipline ?? {};
+  const disciplinesWithStats = disciplines.map((discipline) => {
+    const disciplineStudents = toStudentArray(studentsByDiscipline[discipline.id]);
 
     return {
-      ...course,
-      totalStudents: courseStudents.length,
-      activeStudents: courseStudents.filter((student) => student.status === "ACTIVE").length,
-      pendingStudents: courseStudents.filter((student) => student.status === "PENDING").length,
+      ...discipline,
+      totalStudents: disciplineStudents.length,
+      activeStudents: disciplineStudents.filter((student) => student.status === "ACTIVE").length,
+      pendingStudents: disciplineStudents.filter((student) => student.status === "PENDING").length,
     };
   });
   const campusStats = campuses.map((campus) => {
     const campusPrograms = programs.filter((program) => program.campusId === campus.id);
-    const campusCourses = coursesWithStats.filter((course) => course.campusId === campus.id);
+    const campusDisciplines = disciplinesWithStats.filter((discipline) => discipline.campusId === campus.id);
 
     return {
       ...campus,
       programsCount: campusPrograms.length,
-      coursesCount: campusCourses.length,
-      enrollmentsCount: campusCourses.reduce((sum, course) => sum + course.totalStudents, 0),
-      pendingCount: campusCourses.reduce((sum, course) => sum + course.pendingStudents, 0),
+      disciplinesCount: campusDisciplines.length,
+      enrollmentsCount: campusDisciplines.reduce((sum, discipline) => sum + discipline.totalStudents, 0),
+      pendingCount: campusDisciplines.reduce((sum, discipline) => sum + discipline.pendingStudents, 0),
     };
   });
   const programStats = programs.map((program) => {
-    const programCourses = coursesWithStats.filter((course) => course.programId === program.id);
+    const programDisciplines = disciplinesWithStats.filter((discipline) => discipline.programId === program.id);
 
     return {
       ...program,
-      coursesCount: programCourses.length,
-      enrollmentsCount: programCourses.reduce((sum, course) => sum + course.totalStudents, 0),
-      pendingCount: programCourses.reduce((sum, course) => sum + course.pendingStudents, 0),
+      disciplinesCount: programDisciplines.length,
+      enrollmentsCount: programDisciplines.reduce((sum, discipline) => sum + discipline.totalStudents, 0),
+      pendingCount: programDisciplines.reduce((sum, discipline) => sum + discipline.pendingStudents, 0),
     };
   });
 
@@ -130,7 +130,7 @@ export default function DashboardPage() {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Campus" value={campuses.length} />
             <StatCard label="Cursos" value={programs.length} />
-            <StatCard label="Disciplinas" value={courses.length} />
+            <StatCard label="Disciplinas" value={disciplines.length} />
             <StatCard label="Alunos" value={students.length} />
           </section>
 
@@ -211,9 +211,9 @@ export default function DashboardPage() {
                 </Link>
               </div>
 
-              <Tabs defaultValue="courses" className="mt-5 gap-4">
+              <Tabs defaultValue="disciplines" className="mt-5 gap-4">
                 <TabsList className="h-auto flex-wrap justify-start rounded-2xl bg-muted/70 p-1.5">
-                  <TabsTrigger value="courses" className="rounded-xl px-4 py-2">
+                  <TabsTrigger value="disciplines" className="rounded-xl px-4 py-2">
                     Disciplinas
                   </TabsTrigger>
                   <TabsTrigger value="programs" className="rounded-xl px-4 py-2">
@@ -224,7 +224,7 @@ export default function DashboardPage() {
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="courses">
+                <TabsContent value="disciplines">
                   <div className="max-h-[440px] overflow-auto rounded-2xl border border-border/60">
                     <Table>
                       <TableHeader>
@@ -238,28 +238,28 @@ export default function DashboardPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {coursesWithStats.length ? (
-                          coursesWithStats.map((course) => (
-                            <TableRow key={course.id}>
+                        {disciplinesWithStats.length ? (
+                          disciplinesWithStats.map((discipline) => (
+                            <TableRow key={discipline.id}>
                               <TableCell>
                                 <p className="font-medium text-foreground">
-                                  {course.name}
+                                  {discipline.name}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                  {course.year}/{course.semester}
+                                  {discipline.year}/{discipline.semester}
                                 </p>
                               </TableCell>
-                              <TableCell>{course.campusName}</TableCell>
-                              <TableCell>{course.programName}</TableCell>
-                              <TableCell>{course.totalStudents}</TableCell>
+                              <TableCell>{discipline.campusName}</TableCell>
+                              <TableCell>{discipline.programName}</TableCell>
+                              <TableCell>{discipline.totalStudents}</TableCell>
                               <TableCell>
                                 <Badge variant="outline">
-                                  {course.pendingStudents}
+                                  {discipline.pendingStudents}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
                                 <Link
-                                  href={`/courses/${course.id}`}
+                                  href={`/disciplines/${discipline.id}`}
                                   className={cn(
                                     buttonVariants({ variant: "ghost", size: "sm" })
                                   )}
@@ -307,7 +307,7 @@ export default function DashboardPage() {
                                 </p>
                               </TableCell>
                               <TableCell>{program.campusName}</TableCell>
-                              <TableCell>{program.coursesCount}</TableCell>
+                              <TableCell>{program.disciplinesCount}</TableCell>
                               <TableCell>{program.enrollmentsCount}</TableCell>
                               <TableCell>
                                 <Badge variant="outline">{program.pendingCount}</Badge>
@@ -362,7 +362,7 @@ export default function DashboardPage() {
                                 </p>
                               </TableCell>
                               <TableCell>{campus.programsCount}</TableCell>
-                              <TableCell>{campus.coursesCount}</TableCell>
+                              <TableCell>{campus.disciplinesCount}</TableCell>
                               <TableCell>{campus.enrollmentsCount}</TableCell>
                               <TableCell>
                                 <Badge variant="outline">{campus.pendingCount}</Badge>

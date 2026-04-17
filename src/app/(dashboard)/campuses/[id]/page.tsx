@@ -50,7 +50,7 @@ export default function CampusDetailPage() {
       ),
     [campusId, structureQuery.data?.programs]
   );
-  const courses = structureQuery.data?.courses ?? [];
+  const disciplines = structureQuery.data?.disciplines ?? [];
 
   const createProgram = async (values: {
     name: string;
@@ -119,7 +119,7 @@ export default function CampusDetailPage() {
             Disciplinas
           </p>
           <p className="mt-2 text-3xl font-semibold">
-            {courses.filter((course) => course.campusId === campus.id).length}
+            {disciplines.filter((discipline) => discipline.campusId === campus.id).length}
           </p>
         </Card>
       </section>
@@ -174,8 +174,8 @@ export default function CampusDetailPage() {
           <div className="mt-5 grid max-h-[560px] gap-3 overflow-y-auto pr-1">
             {programs.length ? (
               programs.map((program) => {
-                const programCourses = courses.filter(
-                  (course) => course.programId === program.id
+                const programDisciplines = disciplines.filter(
+                  (discipline) => discipline.programId === program.id
                 );
 
                 return (
@@ -194,7 +194,7 @@ export default function CampusDetailPage() {
                         </p>
                       </div>
                       <Badge variant="outline">
-                        {programCourses.length} disciplina(s)
+                        {programDisciplines.length} disciplina(s)
                       </Badge>
                     </div>
                   </Link>

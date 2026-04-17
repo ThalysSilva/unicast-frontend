@@ -44,21 +44,21 @@ export default function ProgramDetailPage() {
     () => structureQuery.data?.programs.find((item) => item.id === programId),
     [programId, structureQuery.data?.programs]
   );
-  const courses = useMemo(
+  const disciplines = useMemo(
     () =>
-      (structureQuery.data?.courses ?? []).filter(
-        (course) => course.programId === programId
+      (structureQuery.data?.disciplines ?? []).filter(
+        (discipline) => discipline.programId === programId
       ),
-    [programId, structureQuery.data?.courses]
+    [programId, structureQuery.data?.disciplines]
   );
 
-  const createCourse = async (values: {
+  const createDiscipline = async (values: {
     name: string;
     description: string;
     year: number;
     semester: number;
   }) => {
-    const res = await apiRequest<ApiMessage>("/course", {
+    const res = await apiRequest<ApiMessage>("/discipline", {
       method: "POST",
       body: {
         ...values,
@@ -119,7 +119,7 @@ export default function ProgramDetailPage() {
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Disciplinas
           </p>
-          <p className="mt-2 text-3xl font-semibold">{courses.length}</p>
+          <p className="mt-2 text-3xl font-semibold">{disciplines.length}</p>
         </Card>
         <Card className="rounded-2xl border border-border/60 bg-white/90 p-5">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -140,29 +140,29 @@ export default function ProgramDetailPage() {
           <CardContent className="px-6 py-6">
             <form
               className="flex flex-col gap-4"
-              onSubmit={form.handleSubmit(createCourse)}
+              onSubmit={form.handleSubmit(createDiscipline)}
             >
               <div className="space-y-2">
-                <Label htmlFor="course-name">Nome</Label>
-                <Input id="course-name" {...form.register("name")} />
+                <Label htmlFor="discipline-name">Nome</Label>
+                <Input id="discipline-name" {...form.register("name")} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="course-desc">Descricao</Label>
-                <Textarea id="course-desc" {...form.register("description")} />
+                <Label htmlFor="discipline-desc">Descricao</Label>
+                <Textarea id="discipline-desc" {...form.register("description")} />
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="course-year">Ano</Label>
+                  <Label htmlFor="discipline-year">Ano</Label>
                   <Input
-                    id="course-year"
+                    id="discipline-year"
                     type="number"
                     {...form.register("year", { valueAsNumber: true })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="course-sem">Semestre</Label>
+                  <Label htmlFor="discipline-sem">Semestre</Label>
                   <Input
-                    id="course-sem"
+                    id="discipline-sem"
                     type="number"
                     {...form.register("semester", { valueAsNumber: true })}
                   />
@@ -195,24 +195,24 @@ export default function ProgramDetailPage() {
           </div>
 
           <div className="mt-5 grid max-h-[560px] gap-3 overflow-y-auto pr-1">
-            {courses.length ? (
-              courses.map((course) => (
+            {disciplines.length ? (
+              disciplines.map((discipline) => (
                 <Link
-                  key={course.id}
-                  href={`/courses/${course.id}`}
+                  key={discipline.id}
+                  href={`/disciplines/${discipline.id}`}
                   className="block rounded-2xl border border-border/60 bg-background px-5 py-4 transition hover:border-primary/40 hover:bg-white"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-foreground">
-                        {course.name}
+                        {discipline.name}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {course.description || "Sem descricao"}
+                        {discipline.description || "Sem descricao"}
                       </p>
                     </div>
                     <Badge variant="outline">
-                      {course.year}/{course.semester}
+                      {discipline.year}/{discipline.semester}
                     </Badge>
                   </div>
                 </Link>

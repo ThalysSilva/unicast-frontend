@@ -1,12 +1,12 @@
 import { apiRequest, extractData } from "@/lib/api";
-import type { ApiResponse, Campus, Course, Program } from "@/lib/types";
+import type { ApiResponse, Campus, Discipline, Program } from "@/lib/types";
 
 export type AcademicProgram = Program & {
   campusId: string;
   campusName: string;
 };
 
-export type AcademicCourse = Course & {
+export type AcademicDiscipline = Discipline & {
   campusId: string;
   campusName: string;
   programId: string;
@@ -16,7 +16,7 @@ export type AcademicCourse = Course & {
 export type AcademicStructure = {
   campuses: Campus[];
   programs: AcademicProgram[];
-  courses: AcademicCourse[];
+  disciplines: AcademicDiscipline[];
 };
 
 const isProgramLike = (value: unknown): value is Program => {
@@ -26,10 +26,10 @@ const isProgramLike = (value: unknown): value is Program => {
   return Boolean(candidate.id && candidate.name);
 };
 
-const isCourseLike = (value: unknown): value is Course => {
+const isDisciplineLike = (value: unknown): value is Discipline => {
   if (!value || typeof value !== "object") return false;
 
-  const candidate = value as Partial<Course>;
+  const candidate = value as Partial<Discipline>;
   return Boolean(candidate.id && candidate.name);
 };
 
@@ -67,13 +67,13 @@ export const loadAcademicStructure = async (): Promise<AcademicStructure> => {
     new Map(programs.map((program) => [program.id, program])).values()
   );
 
-  const courseResults = await Promise.allSettled(
+  const disciplineResults = await Promise.allSettled(
     uniquePrograms.map((program) =>
-      apiRequest<ApiResponse<Course[]>>(`/course/${program.id}`)
+      apiRequest<ApiResponse<Discipline[]>>(`/discipline/${program.id}`)
     )
   );
 
-  const courses = courseResults.flatMap((result, index) => {
+  const disciplines = disciplineResults.flatMap((result, index) => {
     const program = uniquePrograms[index];
     if (result.status !== "fulfilled") return [];
 
@@ -81,9 +81,9 @@ export const loadAcademicStructure = async (): Promise<AcademicStructure> => {
     if (!Array.isArray(data)) return [];
 
     return data
-      .filter((course): course is Course => isCourseLike(course))
-      .map((course) => ({
-        ...course,
+      .filter((discipline): discipline is Discipline => isDisciplineLike(discipline))
+      .map((discipline) => ({
+        ...discipline,
         campusId: program.campusId,
         campusName: program.campusName,
         programId: program.id,
@@ -94,7 +94,6 @@ export const loadAcademicStructure = async (): Promise<AcademicStructure> => {
   return {
     campuses,
     programs: uniquePrograms,
-    courses,
+    disciplines,
   };
 };
-

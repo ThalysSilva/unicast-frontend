@@ -24,7 +24,7 @@ export type Program = {
   active: boolean;
 };
 
-export type Course = {
+export type Discipline = {
   id: string;
   name: string;
   description?: string;

@@ -31,7 +31,7 @@ export default function SetupPage() {
 
   const campuses = structureQuery.data?.campuses ?? [];
   const programs = structureQuery.data?.programs ?? [];
-  const courses = structureQuery.data?.courses ?? [];
+  const disciplines = structureQuery.data?.disciplines ?? [];
 
   const createCampus = async (values: { name: string; description: string }) => {
     const res = await apiRequest<ApiMessage>("/campus", {
@@ -70,7 +70,7 @@ export default function SetupPage() {
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Disciplinas
           </p>
-          <p className="mt-2 text-3xl font-semibold">{courses.length}</p>
+          <p className="mt-2 text-3xl font-semibold">{disciplines.length}</p>
         </Card>
       </section>
 
@@ -126,8 +126,8 @@ export default function SetupPage() {
                 const campusPrograms = programs.filter(
                   (program) => program.campusId === campus.id
                 );
-                const campusCourses = courses.filter(
-                  (course) => course.campusId === campus.id
+                const campusDisciplines = disciplines.filter(
+                  (discipline) => discipline.campusId === campus.id
                 );
 
                 return (
@@ -150,7 +150,7 @@ export default function SetupPage() {
                           {campusPrograms.length} curso(s)
                         </Badge>
                         <Badge variant="secondary">
-                          {campusCourses.length} disciplina(s)
+                          {campusDisciplines.length} disciplina(s)
                         </Badge>
                       </div>
                     </div>

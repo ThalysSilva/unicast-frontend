@@ -40,7 +40,7 @@ export const Sidebar = () => {
             (item.href === "/setup" &&
               (pathname.startsWith("/campuses/") ||
                 pathname.startsWith("/programs/") ||
-                pathname.startsWith("/courses/")));
+                pathname.startsWith("/disciplines/")));
           const Icon = item.icon;
           return (
             <Link

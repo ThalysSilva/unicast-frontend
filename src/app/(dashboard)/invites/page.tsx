@@ -92,22 +92,22 @@ export default function InvitesPage() {
   const { showToast } = useToast();
 
   const form = useForm({
-    defaultValues: { campusId: "", courseId: "", expiresAt: "" },
+    defaultValues: { campusId: "", disciplineId: "", expiresAt: "" },
   });
   const campusId = useWatch({ control: form.control, name: "campusId" });
-  const courseId = useWatch({ control: form.control, name: "courseId" });
+  const disciplineId = useWatch({ control: form.control, name: "disciplineId" });
   const expiresAt = useWatch({ control: form.control, name: "expiresAt" });
-  const requestedCourseId = searchParams.get("courseId") ?? "";
+  const requestedDisciplineId = searchParams.get("disciplineId") ?? "";
   const structureQuery = useApiQuery({
     queryKey: ["academic-structure"],
     queryFn: loadAcademicStructure,
   });
   const invitesQuery = useApiQuery({
-    queryKey: ["invites", { courseId }],
-    enabled: Boolean(courseId),
+    queryKey: ["invites", { disciplineId }],
+    enabled: Boolean(disciplineId),
     queryFn: async () => {
       const response = await apiRequest<ApiResponse<InvitePayload[]>>(
-        `/invite/${courseId}`
+        `/invite/${disciplineId}`
       );
       const data = extractData(response);
       return Array.isArray(data) ? data : [];
@@ -121,31 +121,31 @@ export default function InvitesPage() {
         title: res.message ?? "Convite removido com sucesso",
         variant: "success",
       });
-      await Promise.all([invitesQuery.refetch(), loadCurrentInvite(courseId)]);
+      await Promise.all([invitesQuery.refetch(), loadCurrentInvite(disciplineId)]);
     },
   });
-  const courses = structureQuery.data?.courses ?? [];
+  const disciplines = structureQuery.data?.disciplines ?? [];
   const campuses = structureQuery.data?.campuses ?? [];
-  const campusHasCourses = (selectedCampusId: string) =>
-    courses.some((course) => course.campusId === selectedCampusId);
-  const campusCourses = campusId
-    ? courses.filter((course) => course.campusId === campusId)
+  const campusHasDisciplines = (selectedCampusId: string) =>
+    disciplines.some((discipline) => discipline.campusId === selectedCampusId);
+  const campusDisciplines = campusId
+    ? disciplines.filter((discipline) => discipline.campusId === campusId)
     : [];
-  const selectedCourse = courses.find((course) => course.id === courseId);
+  const selectedDiscipline = disciplines.find((discipline) => discipline.id === disciplineId);
   const generatedInvites = invitesQuery.data ?? [];
   const campusOptions = campuses.map((campus) => ({
     value: campus.id,
-    label: campusHasCourses(campus.id)
+    label: campusHasDisciplines(campus.id)
       ? campus.name
       : `${campus.name} (sem disciplina registrada)`,
   }));
-  const courseOptions = campusCourses.map((course) => ({
-    value: course.id,
-    label: `${course.programName} / ${course.name}`,
+  const disciplineOptions = campusDisciplines.map((discipline) => ({
+    value: discipline.id,
+    label: `${discipline.programName} / ${discipline.name}`,
   })).sort((first, second) =>
     first.label.localeCompare(second.label, "pt-BR", { sensitivity: "base" })
   );
-  const sortedCampusCourses = [...campusCourses].sort((first, second) => {
+  const sortedCampusDisciplines = [...campusDisciplines].sort((first, second) => {
     const firstLabel = `${first.programName} / ${first.name}`;
     const secondLabel = `${second.programName} / ${second.name}`;
 
@@ -154,15 +154,15 @@ export default function InvitesPage() {
     });
   });
 
-  const loadCurrentInvite = async (selectedCourseId: string) => {
-    if (!selectedCourseId) {
+  const loadCurrentInvite = async (selectedDisciplineId: string) => {
+    if (!selectedDisciplineId) {
       setInvite(null);
       return null;
     }
 
     try {
       const inviteRes = await apiRequest<ApiResponse<InvitePayload | null>>(
-        `/invite/${selectedCourseId}/current`
+        `/invite/${selectedDisciplineId}/current`
       );
       const currentInvite = extractData(inviteRes);
       const currentCode = currentInvite?.code ?? null;
@@ -182,34 +182,34 @@ export default function InvitesPage() {
   }, []);
 
   useEffect(() => {
-    if (!requestedCourseId) {
+    if (!requestedDisciplineId) {
       return;
     }
 
-    const requestedCourse = courses.find((course) => course.id === requestedCourseId);
-    if (!requestedCourse) {
+    const requestedDiscipline = disciplines.find((discipline) => discipline.id === requestedDisciplineId);
+    if (!requestedDiscipline) {
       return;
     }
 
-    form.setValue("campusId", requestedCourse.campusId);
-    form.setValue("courseId", requestedCourseId);
-  }, [courses, form, requestedCourseId]);
+    form.setValue("campusId", requestedDiscipline.campusId);
+    form.setValue("disciplineId", requestedDisciplineId);
+  }, [disciplines, form, requestedDisciplineId]);
 
   useEffect(() => {
-    loadCurrentInvite(courseId).catch(() => {
+    loadCurrentInvite(disciplineId).catch(() => {
       showToast({
         title: "Nao foi possivel carregar o convite atual da disciplina.",
         variant: "error",
       });
     });
-  }, [courseId, showToast]);
+  }, [disciplineId, showToast]);
 
   const createInvite = async (values: {
     campusId: string;
-    courseId: string;
+    disciplineId: string;
     expiresAt?: string;
   }) => {
-    if (!values.courseId) {
+    if (!values.disciplineId) {
       showToast({ title: "Selecione uma disciplina", variant: "error" });
       return;
     }
@@ -226,7 +226,7 @@ export default function InvitesPage() {
       : undefined;
 
     const res = await apiRequest<ApiResponse<Record<string, string>> | Record<string, string>>(
-      `/invite/${values.courseId}`,
+      `/invite/${values.disciplineId}`,
       {
         method: "POST",
         body: payload,
@@ -237,7 +237,7 @@ export default function InvitesPage() {
       setInvite(code);
     }
 
-    const currentCode = await loadCurrentInvite(values.courseId);
+    const currentCode = await loadCurrentInvite(values.disciplineId);
     await invitesQuery.refetch();
     if (!currentCode && !code) {
       showToast({
@@ -293,7 +293,7 @@ export default function InvitesPage() {
                 value={campusId}
                 onValueChange={(value) => {
                   form.setValue("campusId", value ?? "");
-                  form.setValue("courseId", "");
+                  form.setValue("disciplineId", "");
                   setInvite(null);
                 }}
               >
@@ -313,9 +313,9 @@ export default function InvitesPage() {
                     <SelectItem
                       key={campus.id}
                       value={campus.id}
-                      disabled={!campusHasCourses(campus.id)}
+                      disabled={!campusHasDisciplines(campus.id)}
                     >
-                      {campusHasCourses(campus.id)
+                      {campusHasDisciplines(campus.id)
                         ? campus.name
                         : `${campus.name} (sem disciplina registrada)`}
                     </SelectItem>
@@ -326,9 +326,9 @@ export default function InvitesPage() {
             <div className="space-y-2">
               <Label>Curso / disciplina</Label>
               <Select
-                value={courseId}
-                onValueChange={(value) => form.setValue("courseId", value ?? "")}
-                disabled={!campusId || !campusCourses.length}
+                value={disciplineId}
+                onValueChange={(value) => form.setValue("disciplineId", value ?? "")}
+                disabled={!campusId || !campusDisciplines.length}
               >
                 <SelectTrigger className="w-full">
                   <SelectValueFromOptions
@@ -336,24 +336,24 @@ export default function InvitesPage() {
                       structureQuery.isLoading
                         ? "Carregando disciplinas..."
                         : campusId
-                          ? campusCourses.length
+                          ? campusDisciplines.length
                             ? "Selecione a disciplina"
                             : "Nenhuma disciplina neste campus"
                           : "Selecione um campus primeiro"
                     }
-                    options={courseOptions}
-                    value={courseId}
+                    options={disciplineOptions}
+                    value={disciplineId}
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {sortedCampusCourses.map((course) => (
-                    <SelectItem key={course.id} value={course.id}>
-                      {course.programName} / {course.name}
+                  {sortedCampusDisciplines.map((discipline) => (
+                    <SelectItem key={discipline.id} value={discipline.id}>
+                      {discipline.programName} / {discipline.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {campusId && !campusCourses.length ? (
+              {campusId && !campusDisciplines.length ? (
                 <p className="text-xs text-muted-foreground">
                   Cadastre uma disciplina neste campus antes de gerar convites.
                 </p>
@@ -429,7 +429,7 @@ export default function InvitesPage() {
                 O horário é preenchido no seu fuso local e convertido automaticamente para o formato aceito pelo backend.
               </p>
             </div>
-            <Button type="submit" disabled={!courseId}>
+            <Button type="submit" disabled={!disciplineId}>
               Gerar convite
             </Button>
           </form>
@@ -456,8 +456,8 @@ export default function InvitesPage() {
                 <InviteQrDialog
                   code={invite}
                   link={inviteLink || `/student/register/${invite}`}
-                  campusName={selectedCourse?.campusName}
-                  courseName={selectedCourse?.name}
+                  campusName={selectedDiscipline?.campusName}
+                  disciplineName={selectedDiscipline?.name}
                 />
                 <Button variant="outline" onClick={copyInviteLink}>
                   Copiar link
@@ -482,13 +482,13 @@ export default function InvitesPage() {
               Historico de convites da disciplina selecionada.
             </p>
           </div>
-          {courseId ? (
+          {disciplineId ? (
             <Badge variant="outline">{generatedInvites.length} link(s)</Badge>
           ) : null}
         </div>
 
         <div className="mt-5 grid max-h-[560px] gap-3 overflow-y-auto pr-1">
-          {!courseId ? (
+          {!disciplineId ? (
             <p className="rounded-2xl border border-border/60 bg-background px-5 py-4 text-sm text-muted-foreground">
               Selecione uma disciplina para ver os links ja gerados.
             </p>
@@ -516,8 +516,8 @@ export default function InvitesPage() {
                     <InviteQrDialog
                       code={item.code}
                       link={buildInviteLink(item.code)}
-                      campusName={selectedCourse?.campusName}
-                      courseName={selectedCourse?.name}
+                      campusName={selectedDiscipline?.campusName}
+                      disciplineName={selectedDiscipline?.name}
                     />
                     <Button
                       type="button"

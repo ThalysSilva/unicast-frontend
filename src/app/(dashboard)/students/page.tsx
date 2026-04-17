@@ -31,7 +31,7 @@ import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData } from "@/lib/api";
 import {
-  type AcademicCourse,
+  type AcademicDiscipline,
   loadAcademicStructure,
 } from "@/lib/academic-structure";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
@@ -44,7 +44,7 @@ import type {
 } from "@/lib/types";
 
 const EMPTY_STUDENTS: Student[] = [];
-const EMPTY_COURSES: AcademicCourse[] = [];
+const EMPTY_DISCIPLINES: AcademicDiscipline[] = [];
 
 const statusFilters: Array<StudentStatus | "ALL"> = [
   "ALL",
@@ -58,8 +58,8 @@ const statusFilters: Array<StudentStatus | "ALL"> = [
 export default function StudentsPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StudentStatus | "ALL">("ALL");
-  const [courseId, setCourseId] = useState("");
-  const [singleCourseId, setSingleCourseId] = useState("");
+  const [disciplineId, setDisciplineId] = useState("");
+  const [singleDisciplineId, setSingleDisciplineId] = useState("");
   const [singleStudentId, setSingleStudentId] = useState("");
   const [importMode, setImportMode] = useState("upsert");
   const [file, setFile] = useState<File | null>(null);
@@ -73,17 +73,17 @@ export default function StudentsPage() {
     },
   });
 
-  const coursesQuery = useApiQuery({
-    queryKey: queryKeys.courses(),
+  const disciplinesQuery = useApiQuery({
+    queryKey: queryKeys.disciplines(),
     queryFn: async () => {
       const structure = await loadAcademicStructure();
-      return structure.courses;
+      return structure.disciplines;
     },
   });
 
   const importStudentsMutation = useApiMutation<ApiMessage, FormData>({
     mutationFn: async (formData) =>
-      apiRequest<ApiMessage>(`/course/${courseId}/students/import?mode=${importMode}`, {
+      apiRequest<ApiMessage>(`/discipline/${disciplineId}/students/import?mode=${importMode}`, {
         method: "POST",
         body: formData,
       }),
@@ -103,12 +103,12 @@ export default function StudentsPage() {
     },
   });
 
-  const addStudentToCourseMutation = useApiMutation<
+  const addStudentToDisciplineMutation = useApiMutation<
     ApiMessage,
-    { courseId: string; studentId: string }
+    { disciplineId: string; studentId: string }
   >({
-    mutationFn: async ({ courseId, studentId }) =>
-      apiRequest<ApiMessage>(`/course/${courseId}/students`, {
+    mutationFn: async ({ disciplineId, studentId }) =>
+      apiRequest<ApiMessage>(`/discipline/${disciplineId}/students`, {
         method: "POST",
         body: { studentId },
       }),
@@ -123,11 +123,11 @@ export default function StudentsPage() {
   });
 
   const students = studentsQuery.data ?? EMPTY_STUDENTS;
-  const courses = coursesQuery.data ?? EMPTY_COURSES;
-  const isLoading = studentsQuery.isLoading || coursesQuery.isLoading;
-  const courseOptions = courses.map((course) => ({
-    value: course.id,
-    label: `${course.name} / ${course.programName}`,
+  const disciplines = disciplinesQuery.data ?? EMPTY_DISCIPLINES;
+  const isLoading = studentsQuery.isLoading || disciplinesQuery.isLoading;
+  const disciplineOptions = disciplines.map((discipline) => ({
+    value: discipline.id,
+    label: `${discipline.name} / ${discipline.programName}`,
   }));
 
   const filtered = useMemo(() => {
@@ -147,14 +147,14 @@ export default function StudentsPage() {
   }, [students, query, status]);
 
   const handleImport = async () => {
-    if (!file || !courseId) return;
+    if (!file || !disciplineId) return;
     const formData = new FormData();
     formData.append("file", file);
     await importStudentsMutation.mutateAsync(formData);
   };
 
   const handleSingleAdd = async () => {
-    if (!singleCourseId || !singleStudentId.trim()) {
+    if (!singleDisciplineId || !singleStudentId.trim()) {
       showToast({
         title: "Selecione a disciplina e informe a matrícula",
         variant: "error",
@@ -162,8 +162,8 @@ export default function StudentsPage() {
       return;
     }
 
-    await addStudentToCourseMutation.mutateAsync({
-      courseId: singleCourseId,
+    await addStudentToDisciplineMutation.mutateAsync({
+      disciplineId: singleDisciplineId,
       studentId: singleStudentId.trim(),
     });
   };
@@ -175,7 +175,7 @@ export default function StudentsPage() {
         description="Acompanhe quem ja concluiu o auto-cadastro, filtre pendencias e importe matriculas em lote por disciplina."
         badge="Base de alunos"
       />
-      <ToastOnError error={studentsQuery.error ?? coursesQuery.error} />
+      <ToastOnError error={studentsQuery.error ?? disciplinesQuery.error} />
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
@@ -277,20 +277,20 @@ export default function StudentsPage() {
               <div className="space-y-2">
                 <Label>Disciplina</Label>
                 <Select
-                  value={singleCourseId}
-                  onValueChange={(value) => setSingleCourseId(value ?? "")}
+                  value={singleDisciplineId}
+                  onValueChange={(value) => setSingleDisciplineId(value ?? "")}
                 >
-                  <SelectTrigger disabled={coursesQuery.isLoading}>
+                  <SelectTrigger disabled={disciplinesQuery.isLoading}>
                     <SelectValueFromOptions
                       placeholder="Selecione"
-                      options={courseOptions}
-                      value={singleCourseId}
+                      options={disciplineOptions}
+                      value={singleDisciplineId}
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    {courses.map((course) => (
-                      <SelectItem key={course.id} value={course.id}>
-                        {course.name}
+                    {disciplines.map((discipline) => (
+                      <SelectItem key={discipline.id} value={discipline.id}>
+                        {discipline.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -301,19 +301,19 @@ export default function StudentsPage() {
                 <Input
                   id="single-student-id"
                   value={singleStudentId}
-                  disabled={addStudentToCourseMutation.isPending}
+                  disabled={addStudentToDisciplineMutation.isPending}
                   onChange={(event) => setSingleStudentId(event.target.value)}
                 />
               </div>
               <Button
                 onClick={handleSingleAdd}
                 disabled={
-                  !singleCourseId ||
+                  !singleDisciplineId ||
                   !singleStudentId.trim() ||
-                  addStudentToCourseMutation.isPending
+                  addStudentToDisciplineMutation.isPending
                 }
               >
-                {addStudentToCourseMutation.isPending
+                {addStudentToDisciplineMutation.isPending
                   ? "Vinculando..."
                   : "Adicionar à disciplina"}
               </Button>
@@ -329,20 +329,20 @@ export default function StudentsPage() {
               <div className="space-y-2">
                 <Label>Disciplina</Label>
                 <Select
-                  value={courseId}
-                  onValueChange={(value) => setCourseId(value ?? "")}
+                  value={disciplineId}
+                  onValueChange={(value) => setDisciplineId(value ?? "")}
                 >
-                  <SelectTrigger disabled={coursesQuery.isLoading}>
+                  <SelectTrigger disabled={disciplinesQuery.isLoading}>
                     <SelectValueFromOptions
                       placeholder="Selecione"
-                      options={courseOptions}
-                      value={courseId}
+                      options={disciplineOptions}
+                      value={disciplineId}
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    {courses.map((course) => (
-                      <SelectItem key={course.id} value={course.id}>
-                        {course.name}
+                    {disciplines.map((discipline) => (
+                      <SelectItem key={discipline.id} value={discipline.id}>
+                        {discipline.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -374,7 +374,7 @@ export default function StudentsPage() {
               </div>
               <Button
                 onClick={handleImport}
-                disabled={!file || !courseId || importStudentsMutation.isPending}
+                disabled={!file || !disciplineId || importStudentsMutation.isPending}
               >
                 {importStudentsMutation.isPending
                   ? "Importando..."

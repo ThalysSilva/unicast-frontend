@@ -33,7 +33,7 @@ import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { ApiError, apiRequest, extractData } from "@/lib/api";
 import {
-  type AcademicCourse,
+  type AcademicDiscipline,
   loadAcademicStructure,
 } from "@/lib/academic-structure";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
@@ -59,9 +59,9 @@ type StudentStatusFilter = "ALL" | StudentStatus;
 const toStudentArray = (value: unknown): Student[] =>
   Array.isArray(value) ? value : [];
 
-export default function CourseDetailPage() {
+export default function DisciplineDetailPage() {
   const params = useParams<{ id: string }>();
-  const courseId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const disciplineId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [origin, setOrigin] = useState("");
   const [studentStatusFilter, setStudentStatusFilter] =
     useState<StudentStatusFilter>("ALL");
@@ -73,10 +73,10 @@ export default function CourseDetailPage() {
   });
 
   const studentsQuery = useApiQuery({
-    queryKey: ["students", { courseId }],
-    enabled: Boolean(courseId),
+    queryKey: ["students", { disciplineId }],
+    enabled: Boolean(disciplineId),
     queryFn: async () => {
-      const params = new URLSearchParams({ course: courseId });
+      const params = new URLSearchParams({ discipline: disciplineId });
       const response = await apiRequest<ApiResponse<Student[]>>(
         `/student?${params.toString()}`
       );
@@ -85,12 +85,12 @@ export default function CourseDetailPage() {
   });
 
   const inviteQuery = useApiQuery({
-    queryKey: ["invite", { courseId }],
-    enabled: Boolean(courseId),
+    queryKey: ["invite", { disciplineId }],
+    enabled: Boolean(disciplineId),
     queryFn: async () => {
       try {
         const response = await apiRequest<ApiResponse<InvitePayload | null>>(
-          `/invite/${courseId}/current`
+          `/invite/${disciplineId}/current`
         );
         return extractData(response);
       } catch (error) {
@@ -102,11 +102,11 @@ export default function CourseDetailPage() {
     },
   });
   const invitesQuery = useApiQuery({
-    queryKey: ["invites", { courseId }],
-    enabled: Boolean(courseId),
+    queryKey: ["invites", { disciplineId }],
+    enabled: Boolean(disciplineId),
     queryFn: async () => {
       const response = await apiRequest<ApiResponse<InvitePayload[]>>(
-        `/invite/${courseId}`
+        `/invite/${disciplineId}`
       );
       const data = extractData(response);
       return Array.isArray(data) ? data : [];
@@ -124,10 +124,10 @@ export default function CourseDetailPage() {
     },
   });
 
-  const course = useMemo<AcademicCourse | undefined>(
+  const discipline = useMemo<AcademicDiscipline | undefined>(
     () =>
-      structureQuery.data?.courses.find((item) => item.id === courseId),
-    [courseId, structureQuery.data?.courses]
+      structureQuery.data?.disciplines.find((item) => item.id === disciplineId),
+    [disciplineId, structureQuery.data?.disciplines]
   );
   const students = studentsQuery.data ?? EMPTY_STUDENTS;
   const invite = inviteQuery.data ?? null;
@@ -197,7 +197,7 @@ export default function CourseDetailPage() {
     return <LoadingState label="Carregando disciplina e turma..." />;
   }
 
-  if (!course) {
+  if (!discipline) {
     return (
       <div className="flex flex-col gap-5">
         <PageHeader
@@ -254,8 +254,8 @@ export default function CourseDetailPage() {
                   <InviteQrDialog
                     code={item.code}
                     link={buildInviteLink(item.code)}
-                    campusName={course.campusName}
-                    courseName={course.name}
+                    campusName={discipline.campusName}
+                    disciplineName={discipline.name}
                   />
                   <button
                     type="button"
@@ -304,17 +304,17 @@ export default function CourseDetailPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        title={course.name}
-        description={`Disciplina cadastrada para o periodo ${course.year}.${course.semester}.`}
+        title={discipline.name}
+        description={`Disciplina cadastrada para o periodo ${discipline.year}.${discipline.semester}.`}
         badge="Disciplina"
       />
       <AcademicBreadcrumb
         className="py-2"
         items={[
           { label: "Estrutura", href: "/setup" },
-          { label: course.campusName, href: `/campuses/${course.campusId}` },
-          { label: course.programName, href: `/programs/${course.programId}` },
-          { label: course.name },
+          { label: discipline.campusName, href: `/campuses/${discipline.campusId}` },
+          { label: discipline.programName, href: `/programs/${discipline.programId}` },
+          { label: discipline.name },
         ]}
       />
       <ToastOnError error={queryError} />
@@ -474,7 +474,7 @@ export default function CourseDetailPage() {
                 Enviar mensagem
               </Link>
               <Link
-                href={`/programs/${course.programId}`}
+                href={`/programs/${discipline.programId}`}
                 className={cn(buttonVariants({ variant: "ghost", size: "lg" }))}
               >
                 Voltar para o curso
@@ -499,8 +499,8 @@ export default function CourseDetailPage() {
                   <InviteQrDialog
                     code={invite.code}
                     link={inviteLink || `/student/register/${invite.code}`}
-                    campusName={course.campusName}
-                    courseName={course.name}
+                    campusName={discipline.campusName}
+                    disciplineName={discipline.name}
                   />
                   <button
                     type="button"
@@ -520,7 +520,7 @@ export default function CourseDetailPage() {
                   Esta disciplina ainda nao tem convite ativo.
                 </p>
                 <Link
-                  href={`/invites?courseId=${course.id}`}
+                  href={`/invites?disciplineId=${discipline.id}`}
                   className={cn(
                     buttonVariants({ variant: "default", size: "sm" })
                   )}
