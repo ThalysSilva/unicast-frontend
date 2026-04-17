@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -36,6 +38,7 @@ import {
 } from "@/lib/academic-structure";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
+import { cn } from "@/lib/utils";
 import type {
   ApiMessage,
   ApiResponse,
@@ -91,15 +94,6 @@ export default function StudentsPage() {
     onSuccess: (res) => {
       showToast({ title: res.message ?? "CSV importado", variant: "success" });
       setFile(null);
-    },
-  });
-
-  const removeStudentMutation = useApiMutation<ApiMessage, string>({
-    mutationFn: async (studentId) =>
-      apiRequest<ApiMessage>(`/student/${studentId}`, { method: "DELETE" }),
-    invalidateQueryKeys: [queryKeys.students()],
-    onSuccess: () => {
-      showToast({ title: "Aluno removido", variant: "success" });
     },
   });
 
@@ -172,14 +166,14 @@ export default function StudentsPage() {
     <div className="flex flex-col gap-8">
       <PageHeader
         title="Matriculas e contatos"
-        description="Acompanhe quem ja concluiu o auto-cadastro, filtre pendencias e importe matriculas em lote por disciplina."
+        description="Gerencie a base global de alunos, contatos, status acadêmico e vínculos com disciplinas."
         badge="Base de alunos"
       />
       <ToastOnError error={studentsQuery.error ?? disciplinesQuery.error} />
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-          <h2 className="text-lg font-semibold">Base da turma</h2>
+          <h2 className="text-lg font-semibold">Base de alunos</h2>
           <div className="mt-4 flex flex-wrap gap-3">
             <Input
               placeholder="Buscar por nome, email ou matricula"
@@ -241,17 +235,14 @@ export default function StudentsPage() {
                         </p>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={removeStudentMutation.isPending}
-                          onClick={() => removeStudentMutation.mutate(student.id)}
+                        <Link
+                          href={`/students/${student.id}`}
+                          className={cn(
+                            buttonVariants({ variant: "outline", size: "sm" })
+                          )}
                         >
-                          {removeStudentMutation.isPending &&
-                          removeStudentMutation.variables === student.id
-                            ? "Removendo..."
-                            : "Remover"}
-                        </Button>
+                          Gerenciar
+                        </Link>
                       </TableCell>
                     </TableRow>
                   ))}
