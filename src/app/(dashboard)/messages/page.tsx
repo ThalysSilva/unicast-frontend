@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -8,6 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,13 +27,16 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
   SelectValueFromOptions,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
+import {
+  type AcademicDiscipline,
+  loadAcademicStructure,
+} from "@/lib/academic-structure";
 import { apiRequest, extractData, getAuth } from "@/lib/api";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
@@ -36,11 +49,33 @@ import type {
 } from "@/lib/types";
 
 const EMPTY_STUDENTS: Student[] = [];
+const EMPTY_DISCIPLINES: AcademicDiscipline[] = [];
 const EMPTY_SMTP: SmtpInstance[] = [];
 const EMPTY_WHATSAPP: WhatsappInstance[] = [];
 
+const toStudentArray = (value: unknown): Student[] =>
+  Array.isArray(value) ? value : [];
+
+const sortByLabel = <T,>(items: T[], getLabel: (item: T) => string) =>
+  [...items].sort((a, b) =>
+    getLabel(a).localeCompare(getLabel(b), "pt-BR", { sensitivity: "base" })
+  );
+
+const uniqueStudents = (groups: Student[][]) =>
+  Array.from(
+    new Map(groups.flat().map((student) => [student.id, student])).values()
+  );
+
+const sameSelection = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((item, index) => item === b[index]);
+
 export default function MessagesPage() {
   const [selected, setSelected] = useState<string[]>([]);
+  const [selectedCampusIds, setSelectedCampusIds] = useState<string[]>([]);
+  const [selectedDisciplineIds, setSelectedDisciplineIds] = useState<string[]>([]);
+  const [excludedDisciplineIds, setExcludedDisciplineIds] = useState<string[]>([]);
+  const [recipientsDialogOpen, setRecipientsDialogOpen] = useState(false);
+  const [recipientSearch, setRecipientSearch] = useState("");
   const { showToast } = useToast();
 
   const form = useForm({
@@ -52,12 +87,9 @@ export default function MessagesPage() {
     },
   });
 
-  const studentsQuery = useApiQuery({
-    queryKey: queryKeys.students(),
-    queryFn: async () => {
-      const response = await apiRequest<ApiResponse<Student[]>>("/student");
-      return extractData(response);
-    },
+  const structureQuery = useApiQuery({
+    queryKey: ["academic-structure"],
+    queryFn: loadAcademicStructure,
   });
 
   const smtpQuery = useApiQuery({
@@ -77,6 +109,63 @@ export default function MessagesPage() {
         ApiResponse<{ instances: WhatsappInstance[] }>
       >("/whatsapp/instance");
       return extractData(response).instances ?? [];
+    },
+  });
+
+  const campuses = useMemo(
+    () =>
+      sortByLabel(structureQuery.data?.campuses ?? [], (campus) => campus.name),
+    [structureQuery.data?.campuses]
+  );
+  const disciplines = useMemo(
+    () =>
+      sortByLabel(
+        structureQuery.data?.disciplines ?? EMPTY_DISCIPLINES,
+        (discipline) =>
+          `${discipline.campusName} ${discipline.programName} ${discipline.name}`
+      ),
+    [structureQuery.data?.disciplines]
+  );
+  const selectedCampusDisciplineIds = useMemo(
+    () =>
+      disciplines
+        .filter((discipline) => selectedCampusIds.includes(discipline.campusId))
+        .map((discipline) => discipline.id),
+    [disciplines, selectedCampusIds]
+  );
+  const selectedScopeDisciplineIds = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...selectedCampusDisciplineIds.filter(
+            (disciplineId) => !excludedDisciplineIds.includes(disciplineId)
+          ),
+          ...selectedDisciplineIds,
+        ])
+      ).sort(),
+    [excludedDisciplineIds, selectedCampusDisciplineIds, selectedDisciplineIds]
+  );
+  const selectedScopeKey = selectedScopeDisciplineIds.join("|");
+
+  const studentsQuery = useApiQuery({
+    queryKey: ["students", { disciplines: selectedScopeKey }],
+    enabled: selectedScopeDisciplineIds.length > 0,
+    queryFn: async () => {
+      const results = await Promise.allSettled(
+        selectedScopeDisciplineIds.map(async (disciplineId) => {
+          const params = new URLSearchParams({ discipline: disciplineId });
+          const response = await apiRequest<ApiResponse<Student[]>>(
+            `/student?${params.toString()}`
+          );
+          return toStudentArray(extractData(response));
+        })
+      );
+
+      return uniqueStudents(
+        results.flatMap((result) =>
+          result.status === "fulfilled" ? [result.value] : []
+        )
+      );
     },
   });
 
@@ -109,12 +198,75 @@ export default function MessagesPage() {
   const smtp = smtpQuery.data ?? EMPTY_SMTP;
   const whatsapp = whatsappQuery.data ?? EMPTY_WHATSAPP;
   const isLoading =
-    studentsQuery.isLoading || smtpQuery.isLoading || whatsappQuery.isLoading;
+    structureQuery.isLoading ||
+    studentsQuery.isLoading ||
+    smtpQuery.isLoading ||
+    whatsappQuery.isLoading;
 
   const toggleStudent = (id: string) => {
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
+  };
+  const toggleCampus = (id: string) => {
+    const campusDisciplineIds = disciplines
+      .filter((discipline) => discipline.campusId === id)
+      .map((discipline) => discipline.id);
+    const hasAllDisciplinesInScope =
+      campusDisciplineIds.length > 0 &&
+      campusDisciplineIds.every((disciplineId) =>
+        selectedScopeDisciplineIds.includes(disciplineId)
+      );
+
+    setSelectedCampusIds((prev) => {
+      if (hasAllDisciplinesInScope) {
+        return prev.filter((item) => item !== id);
+      }
+
+      return prev.includes(id) ? prev : [...prev, id];
+    });
+    setSelectedDisciplineIds((prev) =>
+      hasAllDisciplinesInScope
+        ? prev.filter((disciplineId) => !campusDisciplineIds.includes(disciplineId))
+        : prev
+    );
+    setExcludedDisciplineIds((prev) => {
+      const cleared = prev.filter(
+        (disciplineId) => !campusDisciplineIds.includes(disciplineId)
+      );
+
+      return hasAllDisciplinesInScope
+        ? [...cleared, ...campusDisciplineIds]
+        : cleared;
+    });
+  };
+  const toggleDiscipline = (id: string) => {
+    const discipline = disciplines.find((item) => item.id === id);
+    const isCampusSelected = discipline
+      ? selectedCampusIds.includes(discipline.campusId)
+      : false;
+    const isSelected = selectedScopeDisciplineIds.includes(id);
+
+    if (isSelected) {
+      setSelectedDisciplineIds((prev) => prev.filter((item) => item !== id));
+      if (isCampusSelected) {
+        setExcludedDisciplineIds((prev) =>
+          prev.includes(id) ? prev : [...prev, id]
+        );
+      }
+      return;
+    }
+
+    setExcludedDisciplineIds((prev) => prev.filter((item) => item !== id));
+    setSelectedDisciplineIds((prev) =>
+      prev.includes(id) ? prev : [...prev, id]
+    );
+  };
+  const clearScope = () => {
+    setSelectedCampusIds([]);
+    setSelectedDisciplineIds([]);
+    setExcludedDisciplineIds([]);
+    setSelected([]);
   };
 
   const validSelected = selected.filter((id) =>
@@ -122,8 +274,18 @@ export default function MessagesPage() {
   );
   const selectedCount = validSelected.length;
   const queryError = useMemo(
-    () => studentsQuery.error ?? smtpQuery.error ?? whatsappQuery.error ?? null,
-    [studentsQuery.error, smtpQuery.error, whatsappQuery.error]
+    () =>
+      structureQuery.error ??
+      studentsQuery.error ??
+      smtpQuery.error ??
+      whatsappQuery.error ??
+      null,
+    [
+      structureQuery.error,
+      studentsQuery.error,
+      smtpQuery.error,
+      whatsappQuery.error,
+    ]
   );
   const smtpId = useWatch({ control: form.control, name: "smtp_id" });
   const whatsappId = useWatch({ control: form.control, name: "whatsapp_id" });
@@ -135,6 +297,42 @@ export default function MessagesPage() {
     value: item.id,
     label: item.instanceName ?? item.phone,
   }));
+  const hasScope = selectedScopeDisciplineIds.length > 0;
+  const campusDisciplines = (campusId: string) =>
+    disciplines.filter((discipline) => discipline.campusId === campusId);
+  const normalizedRecipientSearch = recipientSearch.trim().toLocaleLowerCase("pt-BR");
+  const filteredCampuses = campuses.filter((campus) => {
+    if (!normalizedRecipientSearch) return true;
+
+    const campusMatches = campus.name
+      .toLocaleLowerCase("pt-BR")
+      .includes(normalizedRecipientSearch);
+    const disciplineMatches = campusDisciplines(campus.id).some((discipline) =>
+      `${discipline.programName} ${discipline.name} ${discipline.campusName}`
+        .toLocaleLowerCase("pt-BR")
+        .includes(normalizedRecipientSearch)
+    );
+
+    return campusMatches || disciplineMatches;
+  });
+  const filteredDisciplines = disciplines.filter((discipline) => {
+    if (!normalizedRecipientSearch) return true;
+
+    return `${discipline.programName} ${discipline.name} ${discipline.campusName} ${discipline.year}.${discipline.semester}`
+      .toLocaleLowerCase("pt-BR")
+      .includes(normalizedRecipientSearch);
+  });
+  const selectedCampusCount = campuses.filter((campus) =>
+    campusDisciplines(campus.id).some((discipline) =>
+      selectedScopeDisciplineIds.includes(discipline.id)
+    )
+  ).length;
+  const selectedScopeSummary = hasScope
+    ? `${selectedScopeDisciplineIds.length} disciplina(s) no filtro`
+    : "Selecione campus ou disciplina para montar os destinatarios";
+  const recipientsSummary = hasScope
+    ? `${selectedScopeDisciplineIds.length} disciplina(s), ${selectedCampusCount} campus, ${students.length} aluno(s)`
+    : "Nenhum filtro selecionado";
 
   const handleSend = async (values: {
     subject: string;
@@ -158,6 +356,21 @@ export default function MessagesPage() {
     await sendMessageMutation.mutateAsync(values);
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const requestedDisciplineId = params.get("disciplineId");
+    if (requestedDisciplineId) {
+      setSelectedDisciplineIds([requestedDisciplineId]);
+    }
+  }, []);
+
+  useEffect(() => {
+    const next = students.map((student) => student.id).sort();
+    setSelected((prev) => (sameSelection([...prev].sort(), next) ? prev : next));
+  }, [selectedScopeKey, students]);
+
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
@@ -169,13 +382,203 @@ export default function MessagesPage() {
 
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-          <h2 className="text-lg font-semibold">Selecionar alunos</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Marque quem deve receber a mensagem. O envio usa os IDs dos alunos.
-          </p>
-          <div className="mt-4 grid max-h-[560px] gap-3 overflow-y-auto pr-1">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Publico do envio</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Defina o publico por campus, curso ou disciplina.
+              </p>
+            </div>
+          </div>
+
+          <Dialog
+            open={recipientsDialogOpen}
+            onOpenChange={setRecipientsDialogOpen}
+          >
+            <div className="mt-5 rounded-2xl border border-border/60 bg-background px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    Filtro atual
+                  </p>
+                  <p className="mt-1 text-sm font-medium">{recipientsSummary}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {hasScope ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearScope}
+                    >
+                      Limpar
+                    </Button>
+                  ) : null}
+                  <DialogTrigger render={<Button type="button" size="sm" />}>
+                    Definir filtro
+                  </DialogTrigger>
+                </div>
+              </div>
+            </div>
+              <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[min(960px,calc(100vw-2rem))] max-w-none flex-col overflow-hidden p-0 sm:max-w-none">
+                <DialogHeader className="shrink-0 px-5 pt-5">
+                  <DialogTitle>Filtro do publico</DialogTitle>
+                  <DialogDescription>
+                    Escolha campus inteiros ou disciplinas especificas.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="shrink-0 px-5">
+                  <Input
+                    value={recipientSearch}
+                    onChange={(event) => setRecipientSearch(event.target.value)}
+                    placeholder="Buscar por campus, curso ou disciplina"
+                  />
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
+                  <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                    <div className="min-w-0">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <Label>Campus inteiro</Label>
+                        {selectedCampusCount ? (
+                          <span className="text-xs text-muted-foreground">
+                            {selectedCampusCount} selecionado(s)
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="grid gap-2">
+                        {filteredCampuses.map((campus) => {
+                          const campusDisciplineIds = campusDisciplines(campus.id).map(
+                            (discipline) => discipline.id
+                          );
+                          const totalDisciplines = campusDisciplineIds.length;
+                          const selectedDisciplineCount = campusDisciplineIds.filter(
+                            (disciplineId) =>
+                              selectedScopeDisciplineIds.includes(disciplineId)
+                          ).length;
+                          const disabled = totalDisciplines === 0;
+                          const isInScope = selectedDisciplineCount > 0;
+
+                          return (
+                            <button
+                              key={campus.id}
+                              type="button"
+                              disabled={disabled}
+                              onClick={() => toggleCampus(campus.id)}
+                              className={`flex w-full min-w-0 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                                isInScope
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border/60 bg-background hover:border-primary/50"
+                              }`}
+                            >
+                              <Checkbox
+                                checked={isInScope}
+                                disabled={disabled}
+                                className="pointer-events-none"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate font-medium">
+                                  {campus.name}
+                                </span>
+                                <span className="block truncate text-xs text-muted-foreground">
+                                  {disabled
+                                    ? "Sem disciplina registrada"
+                                    : isInScope
+                                      ? `${selectedDisciplineCount} de ${totalDisciplines} disciplina(s) no filtro`
+                                      : `${totalDisciplines} disciplina(s)`}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                        {!filteredCampuses.length ? (
+                          <p className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-muted-foreground">
+                            Nenhum campus encontrado.
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <Label>Curso / disciplina</Label>
+                        {selectedScopeDisciplineIds.length ? (
+                          <span className="text-xs text-muted-foreground">
+                            {selectedScopeDisciplineIds.length} selecionada(s)
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="grid gap-2">
+                        {filteredDisciplines.length ? (
+                          filteredDisciplines.map((discipline) => (
+                            <button
+                              key={discipline.id}
+                              type="button"
+                              onClick={() => toggleDiscipline(discipline.id)}
+                              className={`flex w-full min-w-0 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
+                                selectedScopeDisciplineIds.includes(discipline.id)
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border/60 bg-background hover:border-primary/50"
+                              }`}
+                            >
+                              <Checkbox
+                                checked={selectedScopeDisciplineIds.includes(discipline.id)}
+                                className="pointer-events-none"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate font-medium">
+                                  {discipline.programName} / {discipline.name}
+                                </span>
+                                <span className="block truncate text-xs text-muted-foreground">
+                                  {discipline.campusName} · {discipline.year}.
+                                  {discipline.semester}
+                                </span>
+                              </span>
+                            </button>
+                          ))
+                        ) : (
+                          <p className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-muted-foreground">
+                            Nenhuma disciplina encontrada.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="shrink-0 border-t bg-muted/50 px-5 py-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-xs text-muted-foreground">
+                      {selectedScopeSummary} · {students.length} aluno(s) encontrado(s)
+                    </span>
+                    <div className="flex gap-2 sm:justify-end">
+                    <Button type="button" variant="ghost" onClick={clearScope}>
+                      Limpar
+                    </Button>
+                    <DialogClose render={<Button type="button" />}>
+                      Usar este filtro
+                    </DialogClose>
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+          </Dialog>
+
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold">Alunos no filtro</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Todos entram selecionados; remova quem nao deve receber.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid max-h-[360px] gap-3 overflow-y-auto pr-1">
             {isLoading ? (
               <LoadingState label="Carregando alunos e integracoes..." />
+            ) : !hasScope ? (
+              <EmptyState
+                title="Escolha um filtro de envio"
+                description="Selecione um campus inteiro ou uma ou mais disciplinas para carregar os alunos."
+              />
             ) : students.length ? (
               students.map((student) => (
                 <button
@@ -188,7 +591,10 @@ export default function MessagesPage() {
                       : "border-border/60 bg-background"
                   }`}
                 >
-                  <Checkbox checked={selected.includes(student.id)} />
+                  <Checkbox
+                    checked={selected.includes(student.id)}
+                    className="pointer-events-none"
+                  />
                   <div className="flex-1">
                     <p className="font-medium text-foreground">
                       {student.name ?? "Sem nome"}
@@ -204,8 +610,8 @@ export default function MessagesPage() {
               ))
             ) : (
               <EmptyState
-                title="Nenhum aluno disponivel"
-                description="Cadastre ou importe alunos antes de enviar comunicados."
+                title="Nenhum aluno no filtro"
+                description="Cadastre ou importe matriculas para as disciplinas selecionadas antes de enviar comunicados."
               />
             )}
           </div>

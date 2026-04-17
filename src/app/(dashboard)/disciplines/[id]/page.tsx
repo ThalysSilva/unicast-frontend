@@ -468,7 +468,7 @@ export default function DisciplineDetailPage() {
                 Importar ou adicionar matriculas
               </Link>
               <Link
-                href="/messages"
+                href={`/messages?disciplineId=${discipline.id}`}
                 className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
               >
                 Enviar mensagem
