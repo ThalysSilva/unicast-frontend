@@ -19,6 +19,6 @@ export const studentStatusLabel = (status?: StudentStatus) => {
 };
 
 export const formatPhone = (value?: string) => {
-  if (!value) return "";
+  if (!value) return "Telefone não informado";
   return formatInternationalPhoneInput(value);
 };
