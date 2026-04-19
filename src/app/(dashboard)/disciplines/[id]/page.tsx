@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { FormProvider, useForm } from "react-hook-form";
 
+import { FormInput } from "@/components/forms/form-fields";
 import { InviteQrDialog } from "@/components/invites/invite-qr-dialog";
 import { AcademicBreadcrumb } from "@/components/layout/academic-breadcrumb";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
 import {
@@ -19,7 +22,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValueFromOptions,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -42,7 +54,9 @@ import {
   inviteStatusLabel,
   type InvitePayload,
 } from "@/lib/invites";
+import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
+import { requiredTrimmed } from "@/lib/validation";
 import type { ApiMessage, ApiResponse, Student, StudentStatus } from "@/lib/types";
 
 const statusOrder: StudentStatus[] = [
@@ -55,6 +69,14 @@ const statusOrder: StudentStatus[] = [
 
 const EMPTY_STUDENTS: Student[] = [];
 type StudentStatusFilter = "ALL" | StudentStatus;
+type AddStudentFormValues = {
+  studentId: string;
+};
+
+const importModeOptions = [
+  { value: "upsert", label: "Atualizar ou inserir" },
+  { value: "clean", label: "Substituir lista" },
+];
 
 const toStudentArray = (value: unknown): Student[] =>
   Array.isArray(value) ? value : [];
@@ -65,7 +87,16 @@ export default function DisciplineDetailPage() {
   const [origin, setOrigin] = useState("");
   const [studentStatusFilter, setStudentStatusFilter] =
     useState<StudentStatusFilter>("ALL");
+  const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+  const [isImportStudentsOpen, setIsImportStudentsOpen] = useState(false);
+  const [importMode, setImportMode] = useState("upsert");
+  const [file, setFile] = useState<File | null>(null);
   const { showToast } = useToast();
+  const addStudentForm = useForm<AddStudentFormValues>({
+    defaultValues: {
+      studentId: "",
+    },
+  });
 
   const structureQuery = useApiQuery({
     queryKey: ["academic-structure"],
@@ -81,6 +112,42 @@ export default function DisciplineDetailPage() {
         `/student?${params.toString()}`
       );
       return toStudentArray(extractData(response));
+    },
+  });
+
+  const importStudentsMutation = useApiMutation<ApiMessage, FormData>({
+    mutationFn: async (formData) =>
+      apiRequest<ApiMessage>(
+        `/discipline/${disciplineId}/students/import?mode=${importMode}`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      ),
+    invalidateQueryKeys: [queryKeys.students()],
+    onSuccess: async (res) => {
+      showToast({ title: res.message ?? "CSV importado", variant: "success" });
+      setFile(null);
+      setIsImportStudentsOpen(false);
+      await studentsQuery.refetch();
+    },
+  });
+
+  const addStudentToDisciplineMutation = useApiMutation<ApiMessage, string>({
+    mutationFn: async (studentId) =>
+      apiRequest<ApiMessage>(`/discipline/${disciplineId}/students`, {
+        method: "POST",
+        body: { studentId },
+      }),
+    invalidateQueryKeys: [queryKeys.students()],
+    onSuccess: async (res) => {
+      showToast({
+        title: res.message ?? "Matrícula vinculada com sucesso",
+        variant: "success",
+      });
+      addStudentForm.reset({ studentId: "" });
+      setIsAddStudentOpen(false);
+      await studentsQuery.refetch();
     },
   });
 
@@ -186,6 +253,17 @@ export default function DisciplineDetailPage() {
   };
   const buildInviteLink = (code: string) =>
     origin && code ? `${origin}/student/register/${code}` : `/student/register/${code}`;
+
+  const handleImport = async () => {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    await importStudentsMutation.mutateAsync(formData);
+  };
+
+  const handleSingleAdd = async (values: AddStudentFormValues) => {
+    await addStudentToDisciplineMutation.mutateAsync(values.studentId.trim());
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -301,6 +379,189 @@ export default function DisciplineDetailPage() {
     </Dialog>
   );
 
+  const csvHelpDialog = (
+    <Dialog>
+      <DialogTrigger render={<Button type="button" variant="outline" size="sm" />}>
+        Como montar o CSV
+      </DialogTrigger>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[min(720px,calc(100vw-2rem))] max-w-none overflow-y-auto sm:max-w-none">
+        <DialogHeader>
+          <DialogTitle>Como montar o CSV</DialogTitle>
+          <DialogDescription>
+            Use a primeira linha como cabeçalho. A coluna `studentId` é
+            obrigatória.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid min-w-0 gap-4 text-sm">
+          <div className="rounded-2xl border border-border/60 bg-background p-4">
+            <p className="font-medium">Colunas aceitas</p>
+            <div className="mt-3 grid gap-2 text-muted-foreground">
+              <p>
+                <span className="font-medium text-foreground">studentId</span>:
+                matrícula institucional do aluno. Obrigatória.
+              </p>
+              <p>
+                <span className="font-medium text-foreground">name</span>: nome
+                do aluno. Opcional.
+              </p>
+              <p>
+                <span className="font-medium text-foreground">phone</span>:
+                telefone cru com DDI, DDD e número. Opcional.
+              </p>
+              <p>
+                <span className="font-medium text-foreground">email</span>:
+                email do aluno. Opcional.
+              </p>
+              <p>
+                <span className="font-medium text-foreground">status</span>:
+                opcional. Em branco vira PENDING.
+              </p>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border/60 bg-background p-4">
+            <p className="font-medium">Status aceitos</p>
+            <div className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
+              <p>
+                <span className="font-medium text-foreground">1</span> ou
+                ACTIVE: ativo
+              </p>
+              <p>
+                <span className="font-medium text-foreground">2</span> ou
+                LOCKED/TRANCADO: trancado
+              </p>
+              <p>
+                <span className="font-medium text-foreground">3</span> ou
+                GRADUATED/CONCLUIDO: graduado
+              </p>
+              <p>
+                <span className="font-medium text-foreground">4</span> ou
+                CANCELED/CANCELADO: cancelado
+              </p>
+              <p>
+                <span className="font-medium text-foreground">5</span>,
+                PENDING/PENDENTE ou vazio: pendente
+              </p>
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 font-medium">Exemplo</p>
+            <pre className="max-w-full overflow-x-auto rounded-2xl border border-border/60 bg-muted p-4 text-xs leading-relaxed">
+{`studentId,name,phone,email,status
+112233,Thalys Farias,5511999999999,thalys@email.com,1
+445566,Ana Silva,5521988887777,ana@email.com,5`}
+            </pre>
+          </div>
+          <div className="rounded-2xl border border-border/60 bg-background p-4 text-muted-foreground">
+            <p>
+              Em `Atualizar ou inserir`, o sistema cria alunos novos e vincula
+              alunos existentes a esta disciplina. Em `Substituir lista`, os
+              vínculos atuais da disciplina são limpos antes da importação.
+            </p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const addStudentDialog = (
+    <Dialog open={isAddStudentOpen} onOpenChange={setIsAddStudentOpen}>
+      <DialogTrigger render={<Button type="button" variant="default" size="lg" />}>
+        Adicionar matrícula
+      </DialogTrigger>
+      <DialogContent className="w-[min(520px,calc(100vw-2rem))] max-w-none sm:max-w-none">
+        <DialogHeader>
+          <DialogTitle>Adicionar matrícula</DialogTitle>
+          <DialogDescription>
+            Vincule uma matrícula diretamente a {discipline.name}.
+          </DialogDescription>
+        </DialogHeader>
+        <FormProvider {...addStudentForm}>
+          <form
+            className="grid gap-4"
+            onSubmit={addStudentForm.handleSubmit(handleSingleAdd)}
+          >
+            <FormInput<AddStudentFormValues>
+              name="studentId"
+              label="Matrícula"
+              disabled={addStudentToDisciplineMutation.isPending}
+              rules={{
+                required: "Informe a matrícula",
+                validate: requiredTrimmed("Informe a matrícula"),
+              }}
+            />
+            <Button
+              type="submit"
+              disabled={addStudentToDisciplineMutation.isPending}
+            >
+              {addStudentToDisciplineMutation.isPending
+                ? "Vinculando..."
+                : "Adicionar à disciplina"}
+            </Button>
+          </form>
+        </FormProvider>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const importStudentsDialog = (
+    <Dialog open={isImportStudentsOpen} onOpenChange={setIsImportStudentsOpen}>
+      <DialogTrigger render={<Button type="button" variant="outline" size="lg" />}>
+        Importar CSV
+      </DialogTrigger>
+      <DialogContent className="w-[min(560px,calc(100vw-2rem))] max-w-none sm:max-w-none">
+        <DialogHeader>
+          <DialogTitle>Importar matrículas</DialogTitle>
+          <DialogDescription>
+            Carregue um CSV para montar a turma de {discipline.name}.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <div className="flex justify-end">{csvHelpDialog}</div>
+          <div className="space-y-2">
+            <Label>Modo de importação</Label>
+            <Select
+              value={importMode}
+              onValueChange={(value) => setImportMode(value ?? "upsert")}
+            >
+              <SelectTrigger disabled={importStudentsMutation.isPending}>
+                <SelectValueFromOptions
+                  placeholder="Modo"
+                  options={importModeOptions}
+                  value={importMode}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {importModeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Arquivo CSV</Label>
+            <Input
+              type="file"
+              accept=".csv"
+              disabled={importStudentsMutation.isPending}
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={handleImport}
+            disabled={!file || importStudentsMutation.isPending}
+          >
+            {importStudentsMutation.isPending
+              ? "Importando..."
+              : "Importar matrículas"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
@@ -367,7 +628,7 @@ export default function DisciplineDetailPage() {
               href="/students"
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
             >
-              Gerenciar matriculas
+              Ver base de alunos
             </Link>
           </div>
 
@@ -461,12 +722,8 @@ export default function DisciplineDetailPage() {
           <Card className="rounded-3xl border border-border/60 bg-white/90 p-5">
             <h2 className="text-lg font-semibold">Acoes</h2>
             <div className="mt-4 flex flex-col gap-3">
-              <Link
-                href="/students"
-                className={cn(buttonVariants({ variant: "default", size: "lg" }))}
-              >
-                Importar ou adicionar matriculas
-              </Link>
+              {addStudentDialog}
+              {importStudentsDialog}
               <Link
                 href={`/messages?disciplineId=${discipline.id}`}
                 className={cn(buttonVariants({ variant: "outline", size: "lg" }))}

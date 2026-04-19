@@ -5,29 +5,11 @@ import { useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  SelectValueFromOptions,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -36,29 +18,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ToastOnError, useToast } from "@/components/ui/toast-provider";
-import { useApiMutation } from "@/hooks/use-api-mutation";
+import { ToastOnError } from "@/components/ui/toast-provider";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest, extractData } from "@/lib/api";
-import {
-  type AcademicDiscipline,
-  loadAcademicStructure,
-} from "@/lib/academic-structure";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
-import type {
-  ApiMessage,
-  ApiResponse,
-  Student,
-  StudentStatus,
-} from "@/lib/types";
+import type { ApiResponse, Student, StudentStatus } from "@/lib/types";
 
 const EMPTY_STUDENTS: Student[] = [];
-const EMPTY_DISCIPLINES: AcademicDiscipline[] = [];
 
-const statusFilters: Array<StudentStatus | "ALL"> = [
-  "ALL",
+type StudentStatusFilter = StudentStatus | "ALL";
+
+const statusOrder: StudentStatus[] = [
   "ACTIVE",
   "PENDING",
   "LOCKED",
@@ -66,20 +38,9 @@ const statusFilters: Array<StudentStatus | "ALL"> = [
   "GRADUATED",
 ];
 
-const importModeOptions = [
-  { value: "upsert", label: "Atualizar ou inserir" },
-  { value: "clean", label: "Substituir lista" },
-];
-
 export default function StudentsPage() {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<StudentStatus | "ALL">("ALL");
-  const [disciplineId, setDisciplineId] = useState("");
-  const [singleDisciplineId, setSingleDisciplineId] = useState("");
-  const [singleStudentId, setSingleStudentId] = useState("");
-  const [importMode, setImportMode] = useState("upsert");
-  const [file, setFile] = useState<File | null>(null);
-  const { showToast } = useToast();
+  const [status, setStatus] = useState<StudentStatusFilter>("ALL");
 
   const studentsQuery = useApiQuery({
     queryKey: queryKeys.students(),
@@ -89,57 +50,14 @@ export default function StudentsPage() {
     },
   });
 
-  const disciplinesQuery = useApiQuery({
-    queryKey: queryKeys.disciplines(),
-    queryFn: async () => {
-      const structure = await loadAcademicStructure();
-      return structure.disciplines;
-    },
-  });
-
-  const importStudentsMutation = useApiMutation<ApiMessage, FormData>({
-    mutationFn: async (formData) =>
-      apiRequest<ApiMessage>(`/discipline/${disciplineId}/students/import?mode=${importMode}`, {
-        method: "POST",
-        body: formData,
-      }),
-    invalidateQueryKeys: [queryKeys.students()],
-    onSuccess: (res) => {
-      showToast({ title: res.message ?? "CSV importado", variant: "success" });
-      setFile(null);
-    },
-  });
-
-  const addStudentToDisciplineMutation = useApiMutation<
-    ApiMessage,
-    { disciplineId: string; studentId: string }
-  >({
-    mutationFn: async ({ disciplineId, studentId }) =>
-      apiRequest<ApiMessage>(`/discipline/${disciplineId}/students`, {
-        method: "POST",
-        body: { studentId },
-      }),
-    invalidateQueryKeys: [queryKeys.students()],
-    onSuccess: (res) => {
-      showToast({
-        title: res.message ?? "Matrícula vinculada com sucesso",
-        variant: "success",
-      });
-      setSingleStudentId("");
-    },
-  });
-
   const students = studentsQuery.data ?? EMPTY_STUDENTS;
-  const disciplines = disciplinesQuery.data ?? EMPTY_DISCIPLINES;
-  const isLoading = studentsQuery.isLoading || disciplinesQuery.isLoading;
-  const disciplineOptions = disciplines.map((discipline) => ({
-    value: discipline.id,
-    label: `${discipline.name} / ${discipline.programName}`,
-  }));
+  const isLoading = studentsQuery.isLoading;
 
-  const filtered = useMemo(() => {
+  const searchedStudents = useMemo(() => {
     return students.filter((student) => {
-      const matchesQuery = [
+      if (!query.trim()) return true;
+
+      return [
         student.name,
         student.email,
         student.studentId,
@@ -147,33 +65,27 @@ export default function StudentsPage() {
       ]
         .filter(Boolean)
         .some((value) => value?.toLowerCase().includes(query.toLowerCase()));
-      const matchesStatus =
-        status === "ALL" ? true : student.status === status;
-      return matchesQuery && matchesStatus;
     });
-  }, [students, query, status]);
+  }, [students, query]);
 
-  const handleImport = async () => {
-    if (!file || !disciplineId) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    await importStudentsMutation.mutateAsync(formData);
-  };
+  const statusFilterItems: Array<{
+    status: StudentStatusFilter;
+    label: string;
+    count: number;
+  }> = [
+    { status: "ALL", label: "Todos", count: searchedStudents.length },
+    ...statusOrder.map((item) => ({
+      status: item,
+      label: studentStatusLabel(item),
+      count: searchedStudents.filter((student) => student.status === item)
+        .length,
+    })),
+  ];
 
-  const handleSingleAdd = async () => {
-    if (!singleDisciplineId || !singleStudentId.trim()) {
-      showToast({
-        title: "Selecione a disciplina e informe a matrícula",
-        variant: "error",
-      });
-      return;
-    }
-
-    await addStudentToDisciplineMutation.mutateAsync({
-      disciplineId: singleDisciplineId,
-      studentId: singleStudentId.trim(),
-    });
-  };
+  const filtered = useMemo(() => {
+    if (status === "ALL") return searchedStudents;
+    return searchedStudents.filter((student) => student.status === status);
+  }, [searchedStudents, status]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -182,32 +94,48 @@ export default function StudentsPage() {
         description="Gerencie a base global de alunos, contatos, status acadêmico e vínculos com disciplinas."
         badge="Base de alunos"
       />
-      <ToastOnError error={studentsQuery.error ?? disciplinesQuery.error} />
+      <ToastOnError error={studentsQuery.error} />
 
-      <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+      <section>
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
           <h2 className="text-lg font-semibold">Base de alunos</h2>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-4 grid gap-3">
             <Input
               placeholder="Buscar por nome, email ou matricula"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <Select
-              value={status}
-              onValueChange={(value) => setStatus((value ?? "ALL") as typeof status)}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                {statusFilters.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item === "ALL" ? "Todos" : item}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
+              {statusFilterItems.map((item) => {
+                const isSelected = status === item.status;
+
+                return (
+                  <button
+                    key={item.status}
+                    type="button"
+                    onClick={() => setStatus(item.status)}
+                    className={cn(
+                      "flex min-h-8 items-center justify-between gap-1 rounded-lg border px-2 py-1 text-left transition",
+                      isSelected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border/60 bg-background hover:border-primary/50"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "text-[11px] leading-none",
+                        isSelected
+                          ? "text-primary-foreground"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                    <span className="text-sm font-semibold">{item.count}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div className="mt-4 max-h-[540px] overflow-auto rounded-2xl border border-border/60">
             {isLoading ? (
@@ -264,188 +192,12 @@ export default function StudentsPage() {
             ) : (
               <EmptyState
                 title="Nenhum aluno encontrado"
-                description="Ajuste os filtros ou importe matriculas para iniciar o fluxo de auto-cadastro."
+                description="Ajuste os filtros ou abra uma disciplina para adicionar ou importar matrículas da turma."
                 className="rounded-none border-0"
               />
             )}
           </div>
         </Card>
-
-        <div className="grid gap-6">
-          <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-            <h2 className="text-lg font-semibold">Adicionar matrícula</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Use este formulário quando entrar um aluno novo depois da importação inicial. O sistema cria ou reaproveita a matrícula e faz o vínculo com a disciplina.
-            </p>
-            <div className="mt-4 flex flex-col gap-4">
-              <div className="space-y-2">
-                <Label>Disciplina</Label>
-                <Select
-                  value={singleDisciplineId}
-                  onValueChange={(value) => setSingleDisciplineId(value ?? "")}
-                >
-                  <SelectTrigger disabled={disciplinesQuery.isLoading}>
-                    <SelectValueFromOptions
-                      placeholder="Selecione"
-                      options={disciplineOptions}
-                      value={singleDisciplineId}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {disciplines.map((discipline) => (
-                      <SelectItem key={discipline.id} value={discipline.id}>
-                        {discipline.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="single-student-id">Matrícula</Label>
-                <Input
-                  id="single-student-id"
-                  value={singleStudentId}
-                  disabled={addStudentToDisciplineMutation.isPending}
-                  onChange={(event) => setSingleStudentId(event.target.value)}
-                />
-              </div>
-              <Button
-                onClick={handleSingleAdd}
-                disabled={
-                  !singleDisciplineId ||
-                  !singleStudentId.trim() ||
-                  addStudentToDisciplineMutation.isPending
-                }
-              >
-                {addStudentToDisciplineMutation.isPending
-                  ? "Vinculando..."
-                  : "Adicionar à disciplina"}
-              </Button>
-            </div>
-          </Card>
-
-          <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold">Importar matriculas</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Envie um CSV com `studentId` obrigatorio para carga inicial ou atualizações maiores da turma.
-                </p>
-              </div>
-              <Dialog>
-                <DialogTrigger render={<Button type="button" variant="outline" size="sm" />}>
-                  Como montar o CSV
-                </DialogTrigger>
-                <DialogContent className="max-h-[calc(100dvh-2rem)] w-[min(720px,calc(100vw-2rem))] max-w-none overflow-y-auto sm:max-w-none">
-                  <DialogHeader>
-                    <DialogTitle>Como montar o CSV</DialogTitle>
-                    <DialogDescription>
-                      Use a primeira linha como cabeçalho. A coluna `studentId` é obrigatória.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid min-w-0 gap-4 text-sm">
-                    <div className="rounded-2xl border border-border/60 bg-background p-4">
-                      <p className="font-medium">Colunas aceitas</p>
-                      <div className="mt-3 grid gap-2 text-muted-foreground">
-                        <p><span className="font-medium text-foreground">studentId</span>: matrícula institucional do aluno. Obrigatória.</p>
-                        <p><span className="font-medium text-foreground">name</span>: nome do aluno. Opcional.</p>
-                        <p><span className="font-medium text-foreground">phone</span>: telefone cru com DDI, DDD e número. Opcional.</p>
-                        <p><span className="font-medium text-foreground">email</span>: email do aluno. Opcional.</p>
-                        <p><span className="font-medium text-foreground">status</span>: opcional. Em branco vira PENDING.</p>
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-border/60 bg-background p-4">
-                      <p className="font-medium">Status aceitos</p>
-                      <div className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
-                        <p><span className="font-medium text-foreground">1</span> ou ACTIVE: ativo</p>
-                        <p><span className="font-medium text-foreground">2</span> ou LOCKED/TRANCADO: trancado</p>
-                        <p><span className="font-medium text-foreground">3</span> ou GRADUATED/CONCLUIDO: graduado</p>
-                        <p><span className="font-medium text-foreground">4</span> ou CANCELED/CANCELADO: cancelado</p>
-                        <p><span className="font-medium text-foreground">5</span>, PENDING/PENDENTE ou vazio: pendente</p>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="mb-2 font-medium">Exemplo</p>
-                      <pre className="max-w-full overflow-x-auto rounded-2xl border border-border/60 bg-muted p-4 text-xs leading-relaxed">
-{`studentId,name,phone,email,status
-112233,Thalys Farias,5511999999999,thalys@email.com,1
-445566,Ana Silva,5521988887777,ana@email.com,5`}
-                      </pre>
-                    </div>
-                    <div className="rounded-2xl border border-border/60 bg-background p-4 text-muted-foreground">
-                      <p>
-                        Em `Atualizar ou inserir`, o sistema cria alunos novos e vincula alunos existentes à disciplina. Em `Substituir lista`, os vínculos atuais da disciplina são limpos antes da importação.
-                      </p>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="mt-4 flex flex-col gap-4">
-              <div className="space-y-2">
-                <Label>Disciplina</Label>
-                <Select
-                  value={disciplineId}
-                  onValueChange={(value) => setDisciplineId(value ?? "")}
-                >
-                  <SelectTrigger disabled={disciplinesQuery.isLoading}>
-                    <SelectValueFromOptions
-                      placeholder="Selecione"
-                      options={disciplineOptions}
-                      value={disciplineId}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {disciplines.map((discipline) => (
-                      <SelectItem key={discipline.id} value={discipline.id}>
-                        {discipline.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Modo de importacao</Label>
-                <Select
-                  value={importMode}
-                  onValueChange={(value) => setImportMode(value ?? "upsert")}
-                >
-                  <SelectTrigger disabled={importStudentsMutation.isPending}>
-                    <SelectValueFromOptions
-                      placeholder="Modo"
-                      options={importModeOptions}
-                      value={importMode}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {importModeOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Arquivo CSV</Label>
-                <Input
-                  type="file"
-                  accept=".csv"
-                  disabled={importStudentsMutation.isPending}
-                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                />
-              </div>
-              <Button
-                onClick={handleImport}
-                disabled={!file || !disciplineId || importStudentsMutation.isPending}
-              >
-                {importStudentsMutation.isPending
-                  ? "Importando..."
-                  : "Importar matriculas"}
-              </Button>
-            </div>
-          </Card>
-        </div>
       </section>
     </div>
   );
