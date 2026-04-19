@@ -24,7 +24,12 @@ export const formatInternationalPhoneInput = (value: string) => {
     const local = digits.slice(4);
     const first = local.length > 8 ? local.slice(0, 5) : local.slice(0, 4);
     const second = local.length > 8 ? local.slice(5, 9) : local.slice(4, 8);
-    const areaCode = area ? `(${area})` : "";
+
+    if (!local) {
+      return [`+${country}`, area].filter(Boolean).join(" ");
+    }
+
+    const areaCode = area.length === 2 ? `(${area})` : area;
 
     return [
       `+${country}`,
