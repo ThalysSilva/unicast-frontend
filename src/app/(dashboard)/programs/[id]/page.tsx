@@ -5,7 +5,11 @@ import { useParams } from "next/navigation";
 import { useMemo } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 
-import { FormInput, FormTextarea } from "@/components/forms/form-fields";
+import {
+  FormInput,
+  FormSelect,
+  FormTextarea,
+} from "@/components/forms/form-fields";
 import { AcademicBreadcrumb } from "@/components/layout/academic-breadcrumb";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -24,8 +28,16 @@ type DisciplineFormValues = {
   name: string;
   description: string;
   year: number;
-  semester: number;
+  semester: string;
 };
+
+const currentYear = new Date().getFullYear();
+const yearMin = currentYear - 1;
+const yearMax = currentYear + 3;
+const semesterOptions = [
+  { value: "1", label: "1º semestre" },
+  { value: "2", label: "2º semestre" },
+];
 
 export default function ProgramDetailPage() {
   const params = useParams<{ id: string }>();
@@ -36,8 +48,8 @@ export default function ProgramDetailPage() {
     defaultValues: {
       name: "",
       description: "",
-      year: new Date().getFullYear(),
-      semester: 1,
+      year: currentYear,
+      semester: "1",
     },
   });
 
@@ -62,7 +74,10 @@ export default function ProgramDetailPage() {
     const res = await apiRequest<ApiMessage>("/discipline", {
       method: "POST",
       body: {
-        ...values,
+        name: values.name,
+        description: values.description,
+        year: Number(values.year),
+        semester: Number(values.semester),
         program_id: programId,
       },
     });
@@ -164,19 +179,26 @@ export default function ProgramDetailPage() {
                     parseValue={(value) => Number(value)}
                     rules={{
                       required: "Informe o ano",
-                      min: { value: 2000, message: "Ano inválido" },
-                      max: { value: 3000, message: "Ano inválido" },
+                      min: {
+                        value: yearMin,
+                        message: `Use um ano entre ${yearMin} e ${yearMax}`,
+                      },
+                      max: {
+                        value: yearMax,
+                        message: `Use um ano entre ${yearMin} e ${yearMax}`,
+                      },
                     }}
                   />
-                  <FormInput<DisciplineFormValues>
+                  <FormSelect<DisciplineFormValues>
                     name="semester"
                     label="Semestre"
-                    type="number"
-                    parseValue={(value) => Number(value)}
+                    options={semesterOptions}
                     rules={{
                       required: "Informe o semestre",
-                      min: { value: 1, message: "Semestre inválido" },
-                      max: { value: 2, message: "Semestre inválido" },
+                      validate: (value) =>
+                        value === "1" ||
+                        value === "2" ||
+                        "Selecione 1º ou 2º semestre",
                     }}
                   />
                 </div>
