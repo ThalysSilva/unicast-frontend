@@ -124,6 +124,14 @@ export const extractErrorMessage = (payload: unknown) => {
   return messageFromUnknown(payload) ?? "Erro inesperado";
 };
 
+const toUserFacingErrorMessage = (status: number, message: string) => {
+  if (status >= 500) {
+    return "Falha no sistema. Tente novamente em instantes.";
+  }
+
+  return message.replace(/\s*:\s*Err[A-Za-z0-9_]+$/u, "").trim() || message;
+};
+
 const unwrapPayload = <T>(payload: ApiResponse<T> | T): T => {
   if (payload && typeof payload === "object" && "data" in payload) {
     return (payload as ApiResponse<T>).data;
@@ -249,7 +257,10 @@ export const apiRequest = async <T>(
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, extractErrorMessage(payload));
+    throw new ApiError(
+      response.status,
+      toUserFacingErrorMessage(response.status, extractErrorMessage(payload))
+    );
   }
 
   if (payload === null || typeof payload === "undefined") {
