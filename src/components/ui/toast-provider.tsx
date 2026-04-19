@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 
+import { extractErrorMessage } from "@/lib/api";
+
 type ToastVariant = "error" | "success";
 
 type ToastItem = {
@@ -35,7 +37,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const showToast = useCallback(
     ({ title, variant }: Omit<ToastItem, "id">) => {
       const id = Date.now() + Math.floor(Math.random() * 1000);
-      setToasts((current) => [...current, { id, title, variant }]);
+      setToasts((current) => [
+        ...current,
+        { id, title: extractErrorMessage(title), variant },
+      ]);
       window.setTimeout(() => dismissToast(id), TOAST_DURATION_MS);
     },
     [dismissToast]
@@ -90,7 +95,7 @@ export function ToastOnError({
     if (!enabled || !error?.message) return;
 
     showToast({
-      title: error.message,
+      title: extractErrorMessage(error.message),
       variant: "error",
     });
   }, [enabled, error, showToast]);

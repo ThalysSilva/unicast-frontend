@@ -64,19 +64,64 @@ let refreshSessionPromise: Promise<AuthSession | null> | null = null;
 const parsePayload = async (response: Response) =>
   response.json().catch(() => null) as Promise<unknown>;
 
-const extractErrorMessage = (payload: unknown) => {
-  if (payload && typeof payload === "object") {
-    const { error, message } = payload as {
-      error?: string;
-      message?: string;
-    };
+const tryParseJson = (value: string): unknown => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
 
-    if (error || message) {
-      return error ?? message ?? "Erro inesperado";
+const messageFromUnknown = (value: unknown): string | null => {
+  if (!value) return null;
+
+  if (typeof value === "string") {
+    const parsed = tryParseJson(value);
+    if (parsed !== value) {
+      return messageFromUnknown(parsed);
     }
+
+    return value.trim() || null;
   }
 
-  return "Erro inesperado";
+  if (Array.isArray(value)) {
+    const messages = value
+      .map((item) => messageFromUnknown(item))
+      .filter(Boolean);
+    return messages.length ? messages.join("; ") : null;
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const preferred =
+      messageFromUnknown(record.message) ??
+      messageFromUnknown(record.error) ??
+      messageFromUnknown(record.detail) ??
+      messageFromUnknown(record.details);
+
+    if (preferred) return preferred;
+
+    const fieldMessages = Object.values(record)
+      .map((item) => messageFromUnknown(item))
+      .filter(Boolean);
+    return fieldMessages.length ? fieldMessages.join("; ") : null;
+  }
+
+  return null;
+};
+
+export const extractErrorMessage = (payload: unknown) => {
+  if (payload && typeof payload === "object") {
+    const { error, message } = payload as {
+      error?: unknown;
+      message?: unknown;
+    };
+
+    const extracted = messageFromUnknown(message) ?? messageFromUnknown(error);
+    if (extracted) return extracted;
+  }
+
+  return messageFromUnknown(payload) ?? "Erro inesperado";
 };
 
 const unwrapPayload = <T>(payload: ApiResponse<T> | T): T => {
