@@ -36,7 +36,7 @@ import {
 } from "@/lib/academic-structure";
 import { apiRequest, extractData } from "@/lib/api";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
-import { normalizePhone } from "@/lib/phone";
+import { formatInternationalPhoneInput, normalizePhone } from "@/lib/phone";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import {
@@ -83,7 +83,7 @@ const emptyForm = (): StudentForm => ({
 const formFromStudent = (student: Student): StudentForm => ({
   name: student.name ?? "",
   email: student.email ?? "",
-  phone: student.phone ?? "",
+  phone: formatInternationalPhoneInput(student.phone ?? ""),
   annotation: student.annotation ?? "",
   status: student.status ?? "PENDING",
 });

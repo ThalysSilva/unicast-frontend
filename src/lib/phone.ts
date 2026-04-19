@@ -1,4 +1,4 @@
-export const phoneExample = "+55 11 99999-9999";
+export const phoneExample = "+55 (11) 99999-9999";
 
 const onlyDigits = (value: string) => value.replace(/\D/g, "");
 
@@ -24,10 +24,11 @@ export const formatInternationalPhoneInput = (value: string) => {
     const local = digits.slice(4);
     const first = local.length > 8 ? local.slice(0, 5) : local.slice(0, 4);
     const second = local.length > 8 ? local.slice(5, 9) : local.slice(4, 8);
+    const areaCode = area ? `(${area})` : "";
 
     return [
       `+${country}`,
-      area,
+      areaCode,
       first && second ? `${first}-${second}` : first,
     ]
       .filter(Boolean)
