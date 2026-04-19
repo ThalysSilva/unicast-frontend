@@ -79,8 +79,8 @@ export default function CampusDetailPage() {
     return (
       <div className="flex flex-col gap-5">
         <PageHeader
-          title="Campus nao encontrado"
-          description="Volte para a estrutura academica e selecione um campus cadastrado."
+          title="Campus não encontrado"
+          description="Volte para a estrutura acadêmica e selecione um campus cadastrado."
           badge="Campus"
         />
         <Link
@@ -130,7 +130,7 @@ export default function CampusDetailPage() {
           <CardHeader className="border-b border-border/60 px-6 py-6">
             <CardTitle className="text-lg">Novo curso</CardTitle>
             <p className="text-sm text-muted-foreground">
-              O curso sera criado dentro de {campus.name}.
+              O curso será criado dentro de {campus.name}.
             </p>
           </CardHeader>
           <CardContent className="px-6 py-6">
@@ -149,7 +149,7 @@ export default function CampusDetailPage() {
                 />
                 <FormTextarea<ProgramFormValues>
                   name="description"
-                  label="Descricao"
+                  label="Descrição"
                 />
                 <button
                   type="submit"
@@ -197,7 +197,7 @@ export default function CampusDetailPage() {
                           {program.name}
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {program.description || "Sem descricao"}
+                          {program.description || "Sem descrição"}
                         </p>
                       </div>
                       <Badge variant="outline">

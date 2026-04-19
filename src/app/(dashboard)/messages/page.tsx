@@ -397,7 +397,7 @@ export default function MessagesPage() {
   ).length;
   const selectedScopeSummary = hasScope
     ? `${selectedScopeDisciplineIds.length} disciplina(s) no filtro`
-    : "Selecione campus ou disciplina para montar os destinatarios";
+    : "Selecione campus ou disciplina para montar os destinatários";
   const recipientsSummary = hasScope
     ? `${selectedScopeDisciplineIds.length} disciplina(s), ${selectedCampusCount} campus, ${students.length} aluno(s)`
     : "Nenhum filtro selecionado";
@@ -447,9 +447,9 @@ export default function MessagesPage() {
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">Publico do envio</h2>
+              <h2 className="text-lg font-semibold">Público do envio</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Defina o publico por campus, curso ou disciplina.
+                Defina o público por campus, curso ou disciplina.
               </p>
             </div>
           </div>
@@ -485,9 +485,9 @@ export default function MessagesPage() {
             </div>
               <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[min(960px,calc(100vw-2rem))] max-w-none flex-col overflow-hidden p-0 sm:max-w-none">
                 <DialogHeader className="shrink-0 px-5 pt-5">
-                  <DialogTitle>Filtro do publico</DialogTitle>
+                  <DialogTitle>Filtro do público</DialogTitle>
                   <DialogDescription>
-                    Escolha campus inteiros ou disciplinas especificas.
+                    Escolha campus inteiros ou disciplinas específicas.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="shrink-0 px-5">
@@ -629,14 +629,14 @@ export default function MessagesPage() {
             <div>
               <h3 className="text-sm font-semibold">Alunos no filtro</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Todos entram selecionados; remova quem nao deve receber.
+                Todos entram selecionados; remova quem não deve receber.
               </p>
             </div>
           </div>
 
           <div className="mt-3 grid max-h-[360px] gap-3 overflow-y-auto pr-1">
             {isLoading ? (
-              <LoadingState label="Carregando alunos e integracoes..." />
+              <LoadingState label="Carregando alunos e integrações..." />
             ) : !hasScope ? (
               <EmptyState
                 title="Escolha um filtro de envio"
@@ -685,7 +685,7 @@ export default function MessagesPage() {
             ) : (
               <EmptyState
                 title="Nenhum aluno no filtro"
-                description="Cadastre ou importe matriculas para as disciplinas selecionadas antes de enviar comunicados."
+                description="Cadastre ou importe matrículas para as disciplinas selecionadas antes de enviar comunicados."
               />
             )}
           </div>

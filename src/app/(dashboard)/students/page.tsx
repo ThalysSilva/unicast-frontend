@@ -90,7 +90,7 @@ export default function StudentsPage() {
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Matriculas e contatos"
+        title="Matrículas e contatos"
         description="Gerencie a base global de alunos, contatos, status acadêmico e vínculos com disciplinas."
         badge="Base de alunos"
       />
@@ -101,7 +101,7 @@ export default function StudentsPage() {
           <h2 className="text-lg font-semibold">Base de alunos</h2>
           <div className="mt-4 grid gap-3">
             <Input
-              placeholder="Buscar por nome, email ou matricula"
+              placeholder="Buscar por nome, email ou matrícula"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -150,7 +150,7 @@ export default function StudentsPage() {
                     <TableHead>Aluno</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Contato</TableHead>
-                    <TableHead className="text-right">Acoes</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -161,7 +161,7 @@ export default function StudentsPage() {
                           {student.name || "Sem nome"}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Matricula {student.studentId}
+                          Matrícula {student.studentId}
                         </p>
                       </TableCell>
                       <TableCell>

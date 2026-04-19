@@ -17,8 +17,8 @@ export default function Home() {
               Colete contatos da turma sem planilha improvisada.
             </h1>
             <p className="max-w-xl text-base text-muted-foreground md:text-lg">
-              O professor registra as matriculas esperadas, compartilha um convite
-              por link ou QR code em sala e deixa o proprio aluno completar email e
+              O professor registra as matrículas esperadas, compartilha um convite
+              por link ou QR code em sala e deixa o próprio aluno completar email e
               telefone. Depois disso, o envio por WhatsApp e email fica centralizado.
             </p>
             <div className="flex flex-wrap gap-4">
@@ -48,7 +48,7 @@ export default function Home() {
                 Fluxo real de uso
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                A jornada foi pensada para sala de aula, convite projetado e cadastro pelo proprio aluno.
+                A jornada foi pensada para sala de aula, convite projetado e cadastro pelo próprio aluno.
               </p>
             </div>
             <div className="space-y-3">
@@ -56,7 +56,7 @@ export default function Home() {
                 1. Cadastre campus, curso e disciplina.
               </div>
               <div className="rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm">
-                2. Registre as matriculas ou importe a turma por CSV.
+                2. Registre as matrículas ou importe a turma por CSV.
               </div>
               <div className="rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm">
                 3. Gere o convite, compartilhe em sala e receba os contatos preenchidos pelos alunos.

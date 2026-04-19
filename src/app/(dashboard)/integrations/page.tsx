@@ -217,7 +217,7 @@ export default function IntegrationsPage() {
         body: values,
       }),
     onSuccess: (res) => {
-      handleSuccess(res.message ?? "Conexao de email validada");
+      handleSuccess(res.message ?? "Conexão de email validada");
     },
   });
 
@@ -259,7 +259,7 @@ export default function IntegrationsPage() {
         setQrOpen(true);
       }
 
-      handleSuccess(res.message ?? "Conexao solicitada");
+      handleSuccess(res.message ?? "Conexão solicitada");
     },
   });
 
@@ -281,7 +281,7 @@ export default function IntegrationsPage() {
     },
     invalidateQueryKeys: [queryKeys.whatsapp()],
     onSuccess: async (res, values) => {
-      handleSuccess(res.message ?? "Instancia criada");
+      handleSuccess(res.message ?? "Instância criada");
       whatsappForm.reset();
       const instances = await syncWhatsappInstances();
       const normalizedPhone = normalizePhoneDigits(values.phone);
@@ -336,7 +336,7 @@ export default function IntegrationsPage() {
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Integracoes"
+        title="Integrações"
         description="Conecte seus canais de envio para liberar comunicados via email e WhatsApp."
         badge="Email + WhatsApp"
       />
@@ -349,8 +349,8 @@ export default function IntegrationsPage() {
             <DialogTitle>Conectar WhatsApp</DialogTitle>
             <DialogDescription>
               {isQrLoading
-                ? "Criando a instancia e preparando o QR Code."
-                : "Escaneie o QR Code no WhatsApp ou use o codigo de pareamento."}
+                ? "Criando a instância e preparando o QR Code."
+                : "Escaneie o QR Code no WhatsApp ou use o código de pareamento."}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-4">
@@ -368,12 +368,12 @@ export default function IntegrationsPage() {
               />
             ) : (
               <div className="rounded-2xl border border-border/60 bg-muted px-4 py-6 text-sm text-muted-foreground">
-                QR Code indisponivel. Tente novamente.
+                QR Code indisponível. Tente novamente.
               </div>
             )}
             {qrData?.pairingCode ? (
               <div className="rounded-2xl border border-border/60 bg-background px-4 py-2 text-sm">
-                Codigo: <span className="font-semibold">{qrData.pairingCode}</span>
+                Código: <span className="font-semibold">{qrData.pairingCode}</span>
               </div>
             ) : null}
           </div>
@@ -388,7 +388,7 @@ export default function IntegrationsPage() {
               Conectar email pessoal com OAuth
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Use esta opcao para conectar uma conta Gmail sem depender de senha de aplicativo.
+              Use esta opção para conectar uma conta Gmail sem depender de senha de aplicativo.
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
               <Button
@@ -527,23 +527,23 @@ export default function IntegrationsPage() {
                 rules={phoneRules()}
               />
               <Button type="submit" disabled={createWhatsappMutation.isPending}>
-                {createWhatsappMutation.isPending ? "Criando..." : "Criar instancia"}
+                {createWhatsappMutation.isPending ? "Criando..." : "Criar instância"}
               </Button>
             </form>
           </FormProvider>
           <div className="mt-4 max-h-[420px] overflow-auto rounded-2xl border border-border/60">
             {isLoading ? (
               <LoadingState
-                label="Carregando instancias do WhatsApp..."
+                label="Carregando instâncias do WhatsApp..."
                 className="rounded-none border-0"
               />
             ) : whatsapp.length ? (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Instancia</TableHead>
+                    <TableHead>Instância</TableHead>
                     <TableHead>Telefone</TableHead>
-                    <TableHead className="text-right">Acoes</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -605,7 +605,7 @@ export default function IntegrationsPage() {
                               actionMutation.mutate({
                                 path: `/whatsapp/instance/${item.id}`,
                                 method: "DELETE",
-                                success: "Instancia removida",
+                                success: "Instância removida",
                               })
                             }
                           >
@@ -623,8 +623,8 @@ export default function IntegrationsPage() {
               </Table>
             ) : (
               <EmptyState
-                title="Nenhuma instancia criada"
-                description="Crie uma instancia para conectar o WhatsApp ao sistema."
+                title="Nenhuma instância criada"
+                description="Crie uma instância para conectar o WhatsApp ao sistema."
                 className="rounded-none border-0"
               />
             )}

@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import type { ApiResponse, AuthSession } from "@/lib/types";
 
 const schema = z.object({
-  email: z.string().email("Informe um email valido"),
+  email: z.string().email("Informe um email válido"),
   password: z.string().min(4, "Informe a senha"),
 });
 
@@ -81,7 +81,7 @@ export default function LoginPage() {
           </form>
         </FormProvider>
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          Ainda nao tem conta?{" "}
+          Ainda não tem conta?{" "}
           <Link
             href="/register"
             className={cn(buttonVariants({ variant: "link" }))}

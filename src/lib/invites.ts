@@ -16,7 +16,7 @@ export const inviteStatusLabel = (invite: InvitePayload) => {
 };
 
 export const formatInviteExpiration = (expiresAt?: string | null) => {
-  if (!expiresAt) return "Sem expiracao";
+  if (!expiresAt) return "Sem expiração";
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",

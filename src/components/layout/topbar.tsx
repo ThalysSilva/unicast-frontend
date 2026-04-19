@@ -28,7 +28,7 @@ export const Topbar = () => {
     <div className="flex items-center justify-between">
       <div>
         <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-          Sessao ativa
+          Sessão ativa
         </p>
         <p className="text-sm font-medium text-foreground">{userName}</p>
       </div>

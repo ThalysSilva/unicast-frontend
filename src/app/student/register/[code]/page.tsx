@@ -57,7 +57,7 @@ export default function StudentRegisterPage() {
     } catch (err) {
       showToast({
         title:
-          err instanceof Error ? err.message : "Este aluno ja possui cadastro",
+          err instanceof Error ? err.message : "Este aluno já possui cadastro",
         variant: "error",
       });
     }
@@ -93,7 +93,7 @@ export default function StudentRegisterPage() {
                 Complete seu cadastro
               </h1>
               <p className="text-sm text-muted-foreground">
-                Se sua matricula ja foi registrada pelo professor, preencha os dados abaixo para liberar os comunicados por email e WhatsApp.
+                Se sua matrícula já foi registrada pelo professor, preencha os dados abaixo para liberar os comunicados por email e WhatsApp.
               </p>
             </div>
             <FormProvider {...form}>
@@ -103,7 +103,7 @@ export default function StudentRegisterPage() {
               >
                 <FormInput<StudentRegisterForm>
                   name="studentId"
-                  label="Matricula"
+                  label="Matrícula"
                   rules={{ required: "Informe a matrícula" }}
                 />
                 <FormInput<StudentRegisterForm>

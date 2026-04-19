@@ -279,8 +279,8 @@ export default function DisciplineDetailPage() {
     return (
       <div className="flex flex-col gap-5">
         <PageHeader
-          title="Disciplina nao encontrada"
-          description="Volte para a estrutura academica e selecione uma disciplina cadastrada."
+          title="Disciplina não encontrada"
+          description="Volte para a estrutura acadêmica e selecione uma disciplina cadastrada."
           badge="Turma"
         />
         <Link
@@ -566,7 +566,7 @@ export default function DisciplineDetailPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title={discipline.name}
-        description={`Disciplina cadastrada para o periodo ${discipline.year}.${discipline.semester}.`}
+        description={`Disciplina cadastrada para o período ${discipline.year}.${discipline.semester}.`}
         badge="Disciplina"
       />
       <AcademicBreadcrumb
@@ -583,7 +583,7 @@ export default function DisciplineDetailPage() {
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Card className="rounded-2xl border border-border/60 bg-white/90 px-4 py-3">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            Matriculas
+            Matrículas
           </p>
           <p className="mt-0.5 text-2xl font-semibold leading-none">
             {students.length}
@@ -610,7 +610,7 @@ export default function DisciplineDetailPage() {
             Convite
           </p>
           <p className="mt-0.5 text-base font-semibold leading-none">
-            {invite?.code ? invite.code : "Nao gerado"}
+            {invite?.code ? invite.code : "Não gerado"}
           </p>
         </Card>
       </section>
@@ -682,7 +682,7 @@ export default function DisciplineDetailPage() {
                           {student.name || "Sem nome"}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Matricula {student.studentId}
+                          Matrícula {student.studentId}
                         </p>
                       </TableCell>
                       <TableCell>
@@ -704,13 +704,13 @@ export default function DisciplineDetailPage() {
               <EmptyState
                 title={
                   students.length
-                    ? "Nenhuma matricula nesse filtro"
-                    : "Nenhuma matricula vinculada"
+                    ? "Nenhuma matrícula nesse filtro"
+                    : "Nenhuma matrícula vinculada"
                 }
                 description={
                   students.length
                     ? "Selecione outro status para ver os alunos dessa turma."
-                    : "Importe ou adicione matriculas para esta disciplina antes de compartilhar o convite."
+                    : "Importe ou adicione matrículas para esta disciplina antes de compartilhar o convite."
                 }
                 className="rounded-none border-0"
               />
@@ -720,7 +720,7 @@ export default function DisciplineDetailPage() {
 
         <aside className="grid gap-5">
           <Card className="rounded-3xl border border-border/60 bg-white/90 p-5">
-            <h2 className="text-lg font-semibold">Acoes</h2>
+            <h2 className="text-lg font-semibold">Ações</h2>
             <div className="mt-4 flex flex-col gap-3">
               {addStudentDialog}
               {importStudentsDialog}
@@ -740,10 +740,10 @@ export default function DisciplineDetailPage() {
           </Card>
 
           <Card className="rounded-3xl border border-border/60 bg-white/90 p-5">
-            <h2 className="text-lg font-semibold">Ultimo convite gerado</h2>
+            <h2 className="text-lg font-semibold">Último convite gerado</h2>
             {invite?.code ? (
               <div className="mt-4 grid gap-3">
-                <Badge variant="outline">Codigo: {invite.code}</Badge>
+                <Badge variant="outline">Código: {invite.code}</Badge>
                 <div className="rounded-2xl border border-border/60 bg-background px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     Link
@@ -774,7 +774,7 @@ export default function DisciplineDetailPage() {
             ) : (
               <div className="mt-4 grid gap-3">
                 <p className="text-sm text-muted-foreground">
-                  Esta disciplina ainda nao tem convite ativo.
+                  Esta disciplina ainda não tem convite ativo.
                 </p>
                 <Link
                   href={`/invites?disciplineId=${discipline.id}`}

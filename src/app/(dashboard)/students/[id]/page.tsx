@@ -218,7 +218,7 @@ export default function StudentDetailPage() {
     return (
       <div className="flex flex-col gap-5">
         <PageHeader
-          title="Aluno nao encontrado"
+          title="Aluno não encontrado"
           description="Volte para a base de alunos e selecione um cadastro existente."
           badge="Aluno"
         />

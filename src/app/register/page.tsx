@@ -16,8 +16,8 @@ import { cn } from "@/lib/utils";
 
 const schema = z.object({
   name: z.string().min(2, "Informe o nome"),
-  email: z.string().email("Informe um email valido"),
-  password: z.string().min(6, "Senha minima de 6 caracteres"),
+  email: z.string().email("Informe um email válido"),
+  password: z.string().min(6, "Senha mínima de 6 caracteres"),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -35,7 +35,7 @@ export default function RegisterPage() {
     try {
       await apiRequest("/auth/register", { method: "POST", body: values });
       showToast({
-        title: "Cadastro realizado. Voce ja pode entrar.",
+        title: "Cadastro realizado. Você já pode entrar.",
         variant: "success",
       });
       setTimeout(() => router.push("/login"), 800);
@@ -83,7 +83,7 @@ export default function RegisterPage() {
           </form>
         </FormProvider>
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          Ja tem conta?{" "}
+          Já tem conta?{" "}
           <Link
             href="/login"
             className={cn(buttonVariants({ variant: "link" }))}

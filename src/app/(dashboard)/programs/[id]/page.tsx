@@ -100,8 +100,8 @@ export default function ProgramDetailPage() {
     return (
       <div className="flex flex-col gap-5">
         <PageHeader
-          title="Curso nao encontrado"
-          description="Volte para a estrutura academica e selecione um curso cadastrado."
+          title="Curso não encontrado"
+          description="Volte para a estrutura acadêmica e selecione um curso cadastrado."
           badge="Curso"
         />
         <Link
@@ -150,7 +150,7 @@ export default function ProgramDetailPage() {
           <CardHeader className="border-b border-border/60 px-6 py-6">
             <CardTitle className="text-lg">Nova disciplina</CardTitle>
             <p className="text-sm text-muted-foreground">
-              A disciplina sera criada dentro de {program.name}.
+              A disciplina será criada dentro de {program.name}.
             </p>
           </CardHeader>
           <CardContent className="px-6 py-6">
@@ -169,7 +169,7 @@ export default function ProgramDetailPage() {
                 />
                 <FormTextarea<DisciplineFormValues>
                   name="description"
-                  label="Descricao"
+                  label="Descrição"
                 />
                 <div className="grid gap-3 md:grid-cols-2">
                   <FormInput<DisciplineFormValues>
@@ -218,7 +218,7 @@ export default function ProgramDetailPage() {
             <div>
               <h2 className="text-lg font-semibold">Disciplinas deste curso</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Abra uma disciplina para ver a turma, convite e matriculas.
+                Abra uma disciplina para ver a turma, convite e matrículas.
               </p>
             </div>
             <Link
@@ -243,7 +243,7 @@ export default function ProgramDetailPage() {
                         {discipline.name}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {discipline.description || "Sem descricao"}
+                        {discipline.description || "Sem descrição"}
                       </p>
                     </div>
                     <Badge variant="outline">

@@ -48,8 +48,8 @@ export default function SetupPage() {
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Estrutura academica"
-        description="Comece pelo campus. Dentro de cada campus voce organiza cursos, e dentro de cada curso cria as disciplinas e acompanha a turma."
+        title="Estrutura acadêmica"
+        description="Comece pelo campus. Dentro de cada campus você organiza cursos, e dentro de cada curso cria as disciplinas e acompanha a turma."
         badge="Fluxo docente"
       />
       <ToastOnError error={structureQuery.error} />
@@ -80,7 +80,7 @@ export default function SetupPage() {
           <CardHeader className="border-b border-border/60 px-6 py-6">
             <CardTitle className="text-lg">Novo campus</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Campus e a primeira divisao da estrutura. Cursos e disciplinas ficam dentro dele.
+              Campus é a primeira divisão da estrutura. Cursos e disciplinas ficam dentro dele.
             </p>
           </CardHeader>
           <CardContent className="px-6 py-6">
@@ -99,7 +99,7 @@ export default function SetupPage() {
                 />
                 <FormTextarea<CampusFormValues>
                   name="description"
-                  label="Descricao"
+                  label="Descrição"
                 />
                 <button
                   type="submit"
@@ -146,7 +146,7 @@ export default function SetupPage() {
                           {campus.name}
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {campus.description || "Sem descricao"}
+                          {campus.description || "Sem descrição"}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">

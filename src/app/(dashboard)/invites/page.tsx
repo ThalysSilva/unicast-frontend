@@ -204,7 +204,7 @@ export default function InvitesPage() {
   useEffect(() => {
     loadCurrentInvite(disciplineId).catch(() => {
       showToast({
-        title: "Nao foi possivel carregar o convite atual da disciplina.",
+        title: "Não foi possível carregar o convite atual da disciplina.",
         variant: "error",
       });
     });
@@ -247,7 +247,7 @@ export default function InvitesPage() {
     await invitesQuery.refetch();
     if (!currentCode && !code) {
       showToast({
-        title: "O convite foi criado, mas o codigo nao voltou na resposta.",
+        title: "O convite foi criado, mas o código não voltou na resposta.",
         variant: "error",
       });
       return;
@@ -284,7 +284,7 @@ export default function InvitesPage() {
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
           <h2 className="text-lg font-semibold">Criar convite da disciplina</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            O convite serve para o aluno informar matricula, nome, email e telefone sem o professor precisar coletar isso manualmente.
+            O convite serve para o aluno informar matrícula, nome, email e telefone sem o professor precisar coletar isso manualmente.
           </p>
           <FormProvider {...form}>
             <form
@@ -461,10 +461,10 @@ export default function InvitesPage() {
           <h2 className="text-lg font-semibold">Compartilhar com a turma</h2>
           {invite ? (
             <div className="mt-4 space-y-3">
-              <Badge variant="outline">Codigo: {invite}</Badge>
+              <Badge variant="outline">Código: {invite}</Badge>
               <div className="rounded-2xl border border-border/60 bg-background px-4 py-3">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  Link de auto-cadastro
+                  Link de autocadastro
                 </p>
                 <p className="mt-2 break-all text-sm font-medium text-foreground">
                   {inviteLink || `/student/register/${invite}`}
@@ -472,7 +472,7 @@ export default function InvitesPage() {
               </div>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>Use esse link no quadro, no slide da aula ou em um QR code externo.</p>
-                <p>O aluno acessa, informa a matricula e completa os dados de contato.</p>
+                <p>O aluno acessa, informa a matrícula e completa os dados de contato.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <InviteQrDialog
@@ -488,7 +488,7 @@ export default function InvitesPage() {
             </div>
           ) : (
             <p className="mt-4 text-sm text-muted-foreground">
-              Gere um convite para visualizar o link que sera compartilhado com a turma.
+              Gere um convite para visualizar o link que será compartilhado com a turma.
             </p>
           )}
         </Card>
@@ -501,7 +501,7 @@ export default function InvitesPage() {
               Convites gerados pela disciplina selecionada
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Historico de convites da disciplina selecionada.
+              Histórico de convites da disciplina selecionada.
             </p>
           </div>
           {disciplineId ? (
@@ -512,7 +512,7 @@ export default function InvitesPage() {
         <div className="mt-5 grid max-h-[560px] gap-3 overflow-y-auto pr-1">
           {!disciplineId ? (
             <p className="rounded-2xl border border-border/60 bg-background px-5 py-4 text-sm text-muted-foreground">
-              Selecione uma disciplina para ver os links ja gerados.
+              Selecione uma disciplina para ver os links já gerados.
             </p>
           ) : invitesQuery.isLoading ? (
             <p className="rounded-2xl border border-border/60 bg-background px-5 py-4 text-sm text-muted-foreground">

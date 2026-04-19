@@ -117,9 +117,9 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title={`Ola, ${userName}`}
-        description="Acompanhe quantas turmas ja estao estruturadas, quantas matriculas aguardam auto-cadastro e o que falta para iniciar os disparos."
-        badge="Comunicacao da turma"
+        title={`Olá, ${userName}`}
+        description="Acompanhe quantas turmas já estão estruturadas, quantas matrículas aguardam autocadastro e o que falta para iniciar os disparos."
+        badge="Comunicação da turma"
       />
       <ToastOnError error={summaryQuery.error} />
 
@@ -142,7 +142,7 @@ export default function DashboardPage() {
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {[
                   "Estruture campus, curso e disciplina",
-                  "Registre as matriculas esperadas",
+                  "Registre as matrículas esperadas",
                   "Gere o convite da disciplina",
                   "Projete o link ou QR code em sala",
                   "Aguarde os alunos completarem email e telefone",
@@ -187,7 +187,7 @@ export default function DashboardPage() {
                 ))}
               </div>
               <p className="mt-4 text-sm text-muted-foreground">
-                Pendentes ainda nao concluíram o auto-cadastro. Ativos ja podem receber mensagens pelos canais configurados.
+                Pendentes ainda não concluíram o autocadastro. Ativos já podem receber mensagens pelos canais configurados.
               </p>
             </Card>
           </section>
@@ -197,7 +197,7 @@ export default function DashboardPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold text-foreground">
-                    Visao geral
+                    Visão geral
                   </h2>
                   <p className="mt-2 text-sm text-muted-foreground">
                     Consulte a estrutura por disciplina, curso ou campus e abra o item para continuar o trabalho.
@@ -234,7 +234,7 @@ export default function DashboardPage() {
                           <TableHead>Curso</TableHead>
                           <TableHead>Alunos</TableHead>
                           <TableHead>Pendentes</TableHead>
-                          <TableHead className="text-right">Acoes</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -289,9 +289,9 @@ export default function DashboardPage() {
                           <TableHead>Curso</TableHead>
                           <TableHead>Campus</TableHead>
                           <TableHead>Disciplinas</TableHead>
-                          <TableHead>Matriculas</TableHead>
+                          <TableHead>Matrículas</TableHead>
                           <TableHead>Pendentes</TableHead>
-                          <TableHead className="text-right">Acoes</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -344,9 +344,9 @@ export default function DashboardPage() {
                           <TableHead>Campus</TableHead>
                           <TableHead>Cursos</TableHead>
                           <TableHead>Disciplinas</TableHead>
-                          <TableHead>Matriculas</TableHead>
+                          <TableHead>Matrículas</TableHead>
                           <TableHead>Pendentes</TableHead>
-                          <TableHead className="text-right">Acoes</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -358,7 +358,7 @@ export default function DashboardPage() {
                                   {campus.name}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                  {campus.description || "Sem descricao"}
+                                  {campus.description || "Sem descrição"}
                                 </p>
                               </TableCell>
                               <TableCell>{campus.programsCount}</TableCell>
