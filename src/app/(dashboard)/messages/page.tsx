@@ -34,7 +34,7 @@ import {
   type AcademicDiscipline,
   loadAcademicStructure,
 } from "@/lib/academic-structure";
-import { apiRequest, extractData, getAuth } from "@/lib/api";
+import { apiRequest, extractData } from "@/lib/api";
 import { formatPhone, studentStatusLabel } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
 import { requiredTrimmed } from "@/lib/validation";
@@ -134,7 +134,16 @@ type MessageFormValues = {
 export default function MessagesPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [selectedCampusIds, setSelectedCampusIds] = useState<string[]>([]);
-  const [selectedDisciplineIds, setSelectedDisciplineIds] = useState<string[]>([]);
+  const [selectedDisciplineIds, setSelectedDisciplineIds] = useState<string[]>(
+    () => {
+      if (typeof window === "undefined") return [];
+
+      const requestedDisciplineId = new URLSearchParams(
+        window.location.search
+      ).get("disciplineId");
+      return requestedDisciplineId ? [requestedDisciplineId] : [];
+    }
+  );
   const [excludedDisciplineIds, setExcludedDisciplineIds] = useState<string[]>([]);
   const [recipientsDialogOpen, setRecipientsDialogOpen] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState("");
@@ -249,17 +258,14 @@ export default function MessagesPage() {
     ApiMessage,
     MessageFormValues
   >({
-    mutationFn: async (values) => {
-      const auth = getAuth();
-      return apiRequest<ApiMessage>("/message/send", {
+    mutationFn: async (values) =>
+      apiRequest<ApiMessage>("/message/send", {
         method: "POST",
         body: {
           ...values,
           to: validSelected,
-          jwe: auth?.jwe ?? "",
         },
-      });
-    },
+      }),
     onSuccess: (res) => {
       showToast({ title: res.message ?? "Mensagem enviada", variant: "success" });
     },
@@ -442,18 +448,10 @@ export default function MessagesPage() {
   };
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const params = new URLSearchParams(window.location.search);
-    const requestedDisciplineId = params.get("disciplineId");
-    if (requestedDisciplineId) {
-      setSelectedDisciplineIds([requestedDisciplineId]);
-    }
-  }, []);
-
-  useEffect(() => {
     const next = students.map((student) => student.id).sort();
-    setSelected((prev) => (sameSelection([...prev].sort(), next) ? prev : next));
+    queueMicrotask(() => {
+      setSelected((prev) => (sameSelection([...prev].sort(), next) ? prev : next));
+    });
   }, [selectedScopeKey, students]);
 
   useEffect(() => {

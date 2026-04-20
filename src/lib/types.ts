@@ -4,13 +4,6 @@ export type User = {
   email: string;
 };
 
-export type AuthSession = {
-  accessToken: string;
-  refreshToken: string;
-  jwe: string;
-  user: User;
-};
-
 export type Campus = {
   id: string;
   name: string;

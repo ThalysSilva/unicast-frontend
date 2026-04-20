@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { StatCard } from "@/components/layout/stat-card";
@@ -20,7 +20,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToastOnError } from "@/components/ui/toast-provider";
 import { useApiQuery } from "@/hooks/use-api-query";
-import { apiRequest, extractData, getAuth, onAuthChange } from "@/lib/api";
+import { apiRequest, extractData } from "@/lib/api";
 import { loadAcademicStructure } from "@/lib/academic-structure";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
@@ -30,16 +30,8 @@ const toStudentArray = (value: unknown): Student[] =>
   Array.isArray(value) ? value : [];
 
 export default function DashboardPage() {
-  const [userName, setUserName] = useState("Professor");
-
-  useEffect(() => {
-    const syncUser = () => {
-      setUserName(getAuth()?.user?.name ?? "Professor");
-    };
-
-    syncUser();
-    return onAuthChange(syncUser);
-  }, []);
+  const { data: session } = useSession();
+  const userName = session?.user?.name ?? "Professor";
 
   const summaryQuery = useApiQuery({
     queryKey: queryKeys.dashboardSummary(),

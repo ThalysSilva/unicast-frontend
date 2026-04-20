@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FormProvider, useForm, useWatch } from "react-hook-form";
 
 import { FormInput } from "@/components/forms/form-fields";
@@ -56,6 +56,9 @@ const buildEndOfDay = (daysFromNow: number) => {
   return toDateTimeLocalValue(date);
 };
 
+const isPastExpiration = (value: string) =>
+  new Date(value).getTime() <= Date.now();
+
 const extractInviteCode = (payload: unknown) => {
   if (!payload || typeof payload !== "object") {
     return null;
@@ -94,7 +97,9 @@ const extractInviteCode = (payload: unknown) => {
 export default function InvitesPage() {
   const searchParams = useSearchParams();
   const [invite, setInvite] = useState<string | null>(null);
-  const [origin, setOrigin] = useState("");
+  const [origin] = useState(() =>
+    typeof window === "undefined" ? "" : window.location.origin
+  );
   const { showToast } = useToast();
 
   const form = useForm<InviteFormValues>({
@@ -102,7 +107,6 @@ export default function InvitesPage() {
   });
   const campusId = useWatch({ control: form.control, name: "campusId" });
   const disciplineId = useWatch({ control: form.control, name: "disciplineId" });
-  const expiresAt = useWatch({ control: form.control, name: "expiresAt" });
   const requestedDisciplineId = searchParams.get("disciplineId") ?? "";
   const structureQuery = useApiQuery({
     queryKey: ["academic-structure"],
@@ -130,7 +134,10 @@ export default function InvitesPage() {
       await Promise.all([invitesQuery.refetch(), loadCurrentInvite(disciplineId)]);
     },
   });
-  const disciplines = structureQuery.data?.disciplines ?? [];
+  const disciplines = useMemo(
+    () => structureQuery.data?.disciplines ?? [],
+    [structureQuery.data?.disciplines]
+  );
   const campuses = structureQuery.data?.campuses ?? [];
   const campusHasDisciplines = (selectedCampusId: string) =>
     disciplines.some((discipline) => discipline.campusId === selectedCampusId);
@@ -184,10 +191,6 @@ export default function InvitesPage() {
   };
 
   useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
-
-  useEffect(() => {
     if (!requestedDisciplineId) {
       return;
     }
@@ -219,7 +222,7 @@ export default function InvitesPage() {
       showToast({ title: "Selecione uma disciplina", variant: "error" });
       return;
     }
-    if (values.expiresAt && new Date(values.expiresAt).getTime() <= Date.now()) {
+    if (values.expiresAt && isPastExpiration(values.expiresAt)) {
       showToast({
         title: "A data de expiração precisa ser posterior ao momento atual.",
         variant: "error",

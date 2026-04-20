@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 
 import { FormInput } from "@/components/forms/form-fields";
@@ -84,7 +84,9 @@ const toStudentArray = (value: unknown): Student[] =>
 export default function DisciplineDetailPage() {
   const params = useParams<{ id: string }>();
   const disciplineId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const [origin, setOrigin] = useState("");
+  const [origin] = useState(() =>
+    typeof window === "undefined" ? "" : window.location.origin
+  );
   const [studentStatusFilter, setStudentStatusFilter] =
     useState<StudentStatusFilter>("ALL");
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
@@ -264,12 +266,6 @@ export default function DisciplineDetailPage() {
   const handleSingleAdd = async (values: AddStudentFormValues) => {
     await addStudentToDisciplineMutation.mutateAsync(values.studentId.trim());
   };
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
-    }
-  }, []);
 
   if (isLoading) {
     return <LoadingState label="Carregando disciplina e turma..." />;

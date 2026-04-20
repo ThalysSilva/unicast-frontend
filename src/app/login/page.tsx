@@ -1,5 +1,6 @@
 "use client";
 
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,9 +13,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button-variants";
-import { apiRequest, setAuth } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { ApiResponse, AuthSession } from "@/lib/types";
 
 const schema = z.object({
   email: z.string().email("Informe um email válido"),
@@ -34,14 +33,17 @@ export default function LoginPage() {
 
   const onSubmit = async (values: FormValues) => {
     try {
-      const payload = await apiRequest<ApiResponse<AuthSession>>("/auth/login", {
-        method: "POST",
-        body: values,
+      const result = await signIn("credentials", {
+        ...values,
+        redirect: false,
       });
-      if (payload?.data) {
-        setAuth(payload.data);
-        router.push("/dashboard");
+
+      if (result?.error) {
+        throw new Error("Email ou senha inválidos");
       }
+
+      router.push("/dashboard");
+      router.refresh();
     } catch (err) {
       showToast({
         title: err instanceof Error ? err.message : "Falha ao autenticar",

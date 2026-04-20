@@ -35,7 +35,7 @@ import {
   loadAcademicStructure,
 } from "@/lib/academic-structure";
 import { apiRequest, extractData } from "@/lib/api";
-import { formatPhone, studentStatusLabel } from "@/lib/format";
+import { studentStatusLabel } from "@/lib/format";
 import { formatInternationalPhoneInput, normalizePhone } from "@/lib/phone";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";

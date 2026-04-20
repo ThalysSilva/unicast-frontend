@@ -1,24 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-
-import { getAuth, onAuthChange } from "@/lib/api";
 
 export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
+  const { status } = useSession();
 
   useEffect(() => {
-    const syncAuthState = () => {
-      const auth = getAuth();
-      if (!auth?.accessToken) {
-        router.replace("/login");
-      }
-    };
+    if (status === "unauthenticated") {
+      router.replace("/login");
+    }
+  }, [router, status]);
 
-    syncAuthState();
-    return onAuthChange(syncAuthState);
-  }, [router]);
+  if (status === "loading") {
+    return null;
+  }
 
   return <>{children}</>;
 };

@@ -32,7 +32,7 @@ import {
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
-import { apiRequest, extractData, getAuth } from "@/lib/api";
+import { apiRequest, extractData } from "@/lib/api";
 import { formatPhone } from "@/lib/format";
 import {
   isValidInternationalPhone,
@@ -92,7 +92,6 @@ export default function IntegrationsPage() {
     const status = params.get("oauth_status");
     if (!status) return;
 
-    const provider = params.get("oauth_provider");
     const message = params.get("oauth_message");
     showToast({
       title:
@@ -185,16 +184,11 @@ export default function IntegrationsPage() {
       password: string;
     }
   >({
-    mutationFn: async (values) => {
-      const auth = getAuth();
-      return apiRequest<ApiMessage>("/smtp/instance", {
+    mutationFn: async (values) =>
+      apiRequest<ApiMessage>("/smtp/instance", {
         method: "POST",
-        body: {
-          ...values,
-          jwe: auth?.jwe ?? "",
-        },
-      });
-    },
+        body: values,
+      }),
     invalidateQueryKeys: [queryKeys.smtp()],
     onSuccess: (res) => {
       handleSuccess(res.message ?? "Email conectado");

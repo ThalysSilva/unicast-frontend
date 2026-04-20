@@ -1,26 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { clearAuth, getAuth, onAuthChange } from "@/lib/api";
 
 export const Topbar = () => {
   const router = useRouter();
-  const [userName, setUserName] = useState("Professor");
+  const { data: session } = useSession();
+  const userName = session?.user?.name ?? "Professor";
 
-  useEffect(() => {
-    const syncUser = () => {
-      setUserName(getAuth()?.user?.name ?? "Professor");
-    };
-
-    syncUser();
-    return onAuthChange(syncUser);
-  }, []);
-
-  const handleLogout = () => {
-    clearAuth();
+  const handleLogout = async () => {
+    await signOut({ redirect: false });
     router.push("/login");
   };
 
