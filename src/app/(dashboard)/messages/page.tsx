@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 
@@ -10,7 +11,7 @@ import {
 } from "@/components/forms/form-fields";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -357,14 +358,27 @@ export default function MessagesPage() {
       whatsappQuery.error,
     ]
   );
-  const smtpOptions = smtp.map((item) => ({
-    value: item.id,
-    label: item.email,
-  }));
-  const whatsappOptions = whatsapp.map((item) => ({
-    value: item.id,
-    label: item.phone ? formatPhone(item.phone) : item.instanceName || item.id,
-  }));
+  const smtpOptions = useMemo(
+    () =>
+      smtp.map((item) => ({
+        value: item.id,
+        label: item.email,
+      })),
+    [smtp]
+  );
+  const whatsappOptions = useMemo(
+    () =>
+      whatsapp.map((item) => ({
+        value: item.id,
+        label: item.phone ? formatPhone(item.phone) : item.instanceName || item.id,
+      })),
+    [whatsapp]
+  );
+  const hasSmtp = smtpOptions.length > 0;
+  const hasWhatsapp = whatsappOptions.length > 0;
+  const hasAnyIntegration = hasSmtp || hasWhatsapp;
+  const isSendBlocked =
+    isLoading || sendMessageMutation.isPending || !hasAnyIntegration;
   const hasScope = selectedScopeDisciplineIds.length > 0;
   const campusDisciplines = (campusId: string) =>
     disciplines.filter((discipline) => discipline.campusId === campusId);
@@ -403,6 +417,14 @@ export default function MessagesPage() {
     : "Nenhum filtro selecionado";
 
   const handleSend = async (values: MessageFormValues) => {
+    if (!hasAnyIntegration) {
+      showToast({
+        title: "Configure Email ou WhatsApp antes de enviar mensagens",
+        variant: "error",
+      });
+      return;
+    }
+
     if (!validSelected.length) {
       showToast({ title: "Selecione ao menos um aluno", variant: "error" });
       return;
@@ -433,6 +455,21 @@ export default function MessagesPage() {
     const next = students.map((student) => student.id).sort();
     setSelected((prev) => (sameSelection([...prev].sort(), next) ? prev : next));
   }, [selectedScopeKey, students]);
+
+  useEffect(() => {
+    const currentSmtpId = form.getValues("smtp_id");
+    const currentWhatsappId = form.getValues("whatsapp_id");
+    const nextSmtpId = smtpOptions[0]?.value ?? "";
+    const nextWhatsappId = whatsappOptions[0]?.value ?? "";
+
+    if (!smtpOptions.some((option) => option.value === currentSmtpId)) {
+      form.setValue("smtp_id", nextSmtpId);
+    }
+
+    if (!whatsappOptions.some((option) => option.value === currentWhatsappId)) {
+      form.setValue("whatsapp_id", nextWhatsappId);
+    }
+  }, [form, smtpOptions, whatsappOptions]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -693,6 +730,27 @@ export default function MessagesPage() {
 
         <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
           <h2 className="text-lg font-semibold">Configurar envio</h2>
+          {!isLoading && !hasAnyIntegration ? (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-sm font-medium text-amber-950">
+                Nenhum canal de envio configurado.
+              </p>
+              <p className="mt-1 text-sm text-amber-900">
+                Conecte um email, uma instância de WhatsApp ou ambos para
+                liberar o envio de comunicados.
+              </p>
+              <Link
+                href="/integrations"
+                className={buttonVariants({
+                  variant: "outline",
+                  size: "sm",
+                  className: "mt-3 bg-white",
+                })}
+              >
+                Configurar integrações
+              </Link>
+            </div>
+          ) : null}
           <FormProvider {...form}>
             <form
               className="mt-4 flex flex-col gap-4"
@@ -702,20 +760,36 @@ export default function MessagesPage() {
                 <FormSelect<MessageFormValues>
                   name="smtp_id"
                   label="Email"
-                  disabled={isLoading || sendMessageMutation.isPending}
+                  disabled={isSendBlocked || !hasSmtp}
                   options={smtpOptions}
+                  placeholder={
+                    hasSmtp ? "Selecione" : "Nenhum email configurado"
+                  }
+                  helper={
+                    hasSmtp
+                      ? "Canal usado para enviar o email da mensagem."
+                      : "Cadastre um email em Integrações para usar este canal."
+                  }
                 />
                 <FormSelect<MessageFormValues>
                   name="whatsapp_id"
                   label="WhatsApp"
-                  disabled={isLoading || sendMessageMutation.isPending}
+                  disabled={isSendBlocked || !hasWhatsapp}
                   options={whatsappOptions}
+                  placeholder={
+                    hasWhatsapp ? "Selecione" : "Nenhum WhatsApp configurado"
+                  }
+                  helper={
+                    hasWhatsapp
+                      ? "Canal usado para enviar a mensagem pelo WhatsApp."
+                      : "Crie uma instância em Integrações para usar este canal."
+                  }
                 />
               </div>
               <FormInput<MessageFormValues>
                 name="subject"
                 label="Assunto"
-                disabled={sendMessageMutation.isPending}
+                disabled={isSendBlocked}
                 rules={{
                   required: "Informe o assunto da mensagem",
                   validate: requiredTrimmed("Informe o assunto da mensagem"),
@@ -725,7 +799,7 @@ export default function MessagesPage() {
                 name="body"
                 label="Mensagem"
                 rows={5}
-                disabled={sendMessageMutation.isPending}
+                disabled={isSendBlocked}
                 rules={{
                   required: "Escreva a mensagem",
                   validate: requiredTrimmed("Escreva a mensagem"),
@@ -735,7 +809,10 @@ export default function MessagesPage() {
                 <span className="text-xs text-muted-foreground">
                   {selectedCount} aluno(s) selecionado(s)
                 </span>
-                <Button type="submit" disabled={isLoading || sendMessageMutation.isPending}>
+                <Button
+                  type="submit"
+                  disabled={isSendBlocked || !selectedCount}
+                >
                   {sendMessageMutation.isPending
                     ? "Enviando..."
                     : "Enviar mensagem"}
