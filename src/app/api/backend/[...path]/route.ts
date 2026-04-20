@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 const DEFAULT_BACKEND_URL = "http://localhost:8080";
+const DEFAULT_APP_URL = "http://localhost:3000";
 
 type BackendToken = {
   accessToken?: string;
@@ -22,6 +23,42 @@ const backendBaseUrl = () =>
   process.env.API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   DEFAULT_BACKEND_URL;
+
+const appBaseUrl = () =>
+  process.env.NEXT_PUBLIC_APP_URL ??
+  process.env.AUTH_URL ??
+  process.env.NEXTAUTH_URL ??
+  DEFAULT_APP_URL;
+
+const allowedOrigins = () =>
+  [
+    appBaseUrl(),
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.AUTH_URL,
+    process.env.NEXTAUTH_URL,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new URL(value).origin);
+
+const isMutatingMethod = (method: string) =>
+  !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase());
+
+const validateOrigin = (request: NextRequest) => {
+  if (!isMutatingMethod(request.method)) {
+    return null;
+  }
+
+  const origin = request.headers.get("origin");
+  if (!origin) {
+    return null;
+  }
+
+  if (allowedOrigins().includes(origin)) {
+    return null;
+  }
+
+  return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
+};
 
 const shouldAllowPublic = (path: string) =>
   PUBLIC_PATHS.some((publicPath) =>
@@ -82,6 +119,11 @@ const proxy = async (
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> }
 ) => {
+  const originError = validateOrigin(request);
+  if (originError) {
+    return originError;
+  }
+
   const params = await context.params;
   const path = `/${params.path.join("/")}`;
   const isPublic = shouldAllowPublic(path);
