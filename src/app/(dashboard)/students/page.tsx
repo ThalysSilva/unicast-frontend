@@ -43,7 +43,7 @@ export default function StudentsPage() {
   const [status, setStatus] = useState<StudentStatusFilter>("ALL");
 
   const studentsQuery = useApiQuery({
-    queryKey: queryKeys.students(),
+    queryKey: queryKeys.students.root(),
     queryFn: async () => {
       const response = await apiRequest<ApiResponse<Student[]>>("/student");
       return extractData(response);

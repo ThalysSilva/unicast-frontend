@@ -34,7 +34,7 @@ export default function DashboardPage() {
   const userName = session?.user?.name ?? "Professor";
 
   const summaryQuery = useApiQuery({
-    queryKey: queryKeys.dashboardSummary(),
+    queryKey: queryKeys.dashboard.summary(),
     queryFn: async () => {
       const [structure, studentRes] = await Promise.all([
         loadAcademicStructure(),

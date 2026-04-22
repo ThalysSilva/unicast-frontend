@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { FormProvider, useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { FormInput, FormTextarea } from "@/components/forms/form-fields";
 import { AcademicBreadcrumb } from "@/components/layout/academic-breadcrumb";
@@ -27,6 +28,7 @@ import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest } from "@/lib/api";
 import { loadAcademicStructure } from "@/lib/academic-structure";
+import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { requiredTrimmed } from "@/lib/validation";
 import type { ApiMessage } from "@/lib/types";
@@ -41,6 +43,7 @@ export default function CampusDetailPage() {
   const params = useParams<{ id: string }>();
   const campusId = Array.isArray(params.id) ? params.id[0] : params.id;
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { showToast } = useToast();
 
   const form = useForm<ProgramFormValues>({
@@ -80,7 +83,11 @@ export default function CampusDetailPage() {
 
     showToast({ title: res.message ?? "Curso criado", variant: "success" });
     form.reset({ name: "", description: "", active: true });
-    await structureQuery.refetch();
+    await Promise.all([
+      structureQuery.refetch(),
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.academicStructure.root() }),
+    ]);
   };
 
   const deleteCampusMutation = useApiMutation<ApiMessage, void>({
@@ -88,7 +95,10 @@ export default function CampusDetailPage() {
       apiRequest<ApiMessage>(`/campus/${campusId}`, {
         method: "DELETE",
       }),
-    invalidateQueryKeys: [["academic-structure"]],
+    invalidateQueryKeys: [
+      queryKeys.academicStructure.root(),
+      queryKeys.dashboard.summary(),
+    ],
     onSuccess: (res) => {
       showToast({
         title: res.message ?? "Campus removido com sucesso",

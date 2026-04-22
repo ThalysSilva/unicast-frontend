@@ -1,7 +1,25 @@
+const entityKeys = <TFilters = Record<string, unknown>>(name: string) => ({
+  root: () => [name] as const,
+  list: (filters?: TFilters) => [name, "list", filters ?? {}] as const,
+  detail: (id: string) => [name, "detail", id] as const,
+});
+
+const singletonKey = <TName extends string>(name: TName) => ({
+  root: () => [name] as const,
+});
+
 export const queryKeys = {
-  disciplines: () => ["disciplines"] as const,
-  students: () => ["students"] as const,
-  smtp: () => ["smtp"] as const,
-  whatsapp: () => ["whatsapp"] as const,
-  dashboardSummary: () => ["dashboard-summary"] as const,
+  academicStructure: singletonKey("academic-structure"),
+  campuses: entityKeys("campuses"),
+  programs: entityKeys("programs"),
+  disciplines: entityKeys("disciplines"),
+  students: entityKeys("students"),
+  dashboard: {
+    root: () => ["dashboard"] as const,
+    summary: () => ["dashboard", "summary"] as const,
+  },
+  integrations: {
+    smtp: singletonKey("integrations-smtp"),
+    whatsapp: singletonKey("integrations-whatsapp"),
+  },
 };

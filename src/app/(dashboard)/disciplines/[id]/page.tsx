@@ -129,7 +129,10 @@ export default function DisciplineDetailPage() {
           body: formData,
         }
       ),
-    invalidateQueryKeys: [queryKeys.students()],
+    invalidateQueryKeys: [
+      queryKeys.students.root(),
+      queryKeys.dashboard.summary(),
+    ],
     onSuccess: async (res) => {
       showToast({ title: res.message ?? "CSV importado", variant: "success" });
       setFile(null);
@@ -144,7 +147,10 @@ export default function DisciplineDetailPage() {
         method: "POST",
         body: { studentId },
       }),
-    invalidateQueryKeys: [queryKeys.students()],
+    invalidateQueryKeys: [
+      queryKeys.students.root(),
+      queryKeys.dashboard.summary(),
+    ],
     onSuccess: async (res) => {
       showToast({
         title: res.message ?? "Matrícula vinculada com sucesso",
@@ -200,7 +206,11 @@ export default function DisciplineDetailPage() {
       apiRequest<ApiMessage>(`/discipline/${disciplineId}`, {
         method: "DELETE",
       }),
-    invalidateQueryKeys: [["academic-structure"], queryKeys.students()],
+    invalidateQueryKeys: [
+      queryKeys.academicStructure.root(),
+      queryKeys.students.root(),
+      queryKeys.dashboard.summary(),
+    ],
     onSuccess: (res) => {
       showToast({
         title: res.message ?? "Disciplina removida com sucesso",

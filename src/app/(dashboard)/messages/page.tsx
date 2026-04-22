@@ -158,7 +158,7 @@ export default function MessagesPage() {
   });
 
   const smtpQuery = useApiQuery({
-    queryKey: queryKeys.smtp(),
+    queryKey: queryKeys.integrations.smtp.root(),
     queryFn: async () => {
       const response = await apiRequest<ApiResponse<SmtpInstance[]>>(
         "/smtp/instance"
@@ -168,7 +168,7 @@ export default function MessagesPage() {
   });
 
   const whatsappQuery = useApiQuery({
-    queryKey: queryKeys.whatsapp(),
+    queryKey: queryKeys.integrations.whatsapp.root(),
     queryFn: async () => {
       const response = await apiRequest<
         ApiResponse<{ instances: WhatsappInstance[] }>

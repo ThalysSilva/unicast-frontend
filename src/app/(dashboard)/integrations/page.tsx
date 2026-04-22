@@ -123,7 +123,7 @@ export default function IntegrationsPage() {
   });
 
   const smtpQuery = useApiQuery({
-    queryKey: queryKeys.smtp(),
+    queryKey: queryKeys.integrations.smtp.root(),
     queryFn: async () => {
       const response = await apiRequest<ApiResponse<SmtpInstance[]>>(
         "/smtp/instance"
@@ -133,7 +133,7 @@ export default function IntegrationsPage() {
   });
 
   const whatsappQuery = useApiQuery({
-    queryKey: queryKeys.whatsapp(),
+    queryKey: queryKeys.integrations.whatsapp.root(),
     queryFn: async () => {
       const response = await apiRequest<
         ApiResponse<{ instances: WhatsappInstance[] }>
@@ -189,7 +189,7 @@ export default function IntegrationsPage() {
         method: "POST",
         body: values,
       }),
-    invalidateQueryKeys: [queryKeys.smtp()],
+    invalidateQueryKeys: [queryKeys.integrations.smtp.root()],
     onSuccess: (res) => {
       handleSuccess(res.message ?? "Email conectado");
       smtpForm.reset();
@@ -232,7 +232,7 @@ export default function IntegrationsPage() {
       apiRequest<ApiMessage>(`/smtp/instance/${id}`, {
         method: "DELETE",
       }),
-    invalidateQueryKeys: [queryKeys.smtp()],
+    invalidateQueryKeys: [queryKeys.integrations.smtp.root()],
     onSuccess: (res) => {
       handleSuccess(res.message ?? "Email removido");
     },
@@ -273,7 +273,7 @@ export default function IntegrationsPage() {
         body: { phone },
       });
     },
-    invalidateQueryKeys: [queryKeys.whatsapp()],
+    invalidateQueryKeys: [queryKeys.integrations.whatsapp.root()],
     onSuccess: async (res, values) => {
       handleSuccess(res.message ?? "Instância criada");
       whatsappForm.reset();
@@ -307,7 +307,7 @@ export default function IntegrationsPage() {
   >({
     mutationFn: async ({ path, method }) =>
       apiRequest<ApiMessage>(path, { method }),
-    invalidateQueryKeys: [queryKeys.whatsapp()],
+    invalidateQueryKeys: [queryKeys.integrations.whatsapp.root()],
     onSuccess: (res, variables) => {
       handleSuccess(res.message ?? variables.success);
     },

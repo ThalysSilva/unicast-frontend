@@ -152,7 +152,11 @@ export default function StudentDetailPage() {
           status: values.status,
         },
       }),
-    invalidateQueryKeys: [queryKeys.students(), ["student", { studentId }]],
+    invalidateQueryKeys: [
+      queryKeys.students.root(),
+      queryKeys.dashboard.summary(),
+      ["student", { studentId }],
+    ],
     onSuccess: async (res) => {
       showToast({
         title: res.message ?? "Aluno atualizado",
@@ -170,7 +174,10 @@ export default function StudentDetailPage() {
       apiRequest<ApiMessage>(`/discipline/${disciplineId}/students/${studentId}`, {
         method: "DELETE",
       }),
-    invalidateQueryKeys: [queryKeys.students()],
+    invalidateQueryKeys: [
+      queryKeys.students.root(),
+      queryKeys.dashboard.summary(),
+    ],
     onSuccess: async (res, variables) => {
       showToast({
         title:

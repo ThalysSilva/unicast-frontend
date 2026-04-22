@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { FormProvider, useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   FormInput,
@@ -31,6 +32,7 @@ import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest } from "@/lib/api";
 import { loadAcademicStructure } from "@/lib/academic-structure";
+import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { requiredTrimmed } from "@/lib/validation";
 import type { ApiMessage } from "@/lib/types";
@@ -54,6 +56,7 @@ export default function ProgramDetailPage() {
   const params = useParams<{ id: string }>();
   const programId = Array.isArray(params.id) ? params.id[0] : params.id;
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { showToast } = useToast();
 
   const form = useForm<DisciplineFormValues>({
@@ -101,7 +104,11 @@ export default function ProgramDetailPage() {
       year: values.year,
       semester: values.semester,
     });
-    await structureQuery.refetch();
+    await Promise.all([
+      structureQuery.refetch(),
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.academicStructure.root() }),
+    ]);
   };
 
   const deleteProgramMutation = useApiMutation<ApiMessage, void>({
@@ -109,7 +116,10 @@ export default function ProgramDetailPage() {
       apiRequest<ApiMessage>(`/program/${programId}`, {
         method: "DELETE",
       }),
-    invalidateQueryKeys: [["academic-structure"]],
+    invalidateQueryKeys: [
+      queryKeys.academicStructure.root(),
+      queryKeys.dashboard.summary(),
+    ],
     onSuccess: (res) => {
       showToast({
         title: res.message ?? "Curso removido com sucesso",
