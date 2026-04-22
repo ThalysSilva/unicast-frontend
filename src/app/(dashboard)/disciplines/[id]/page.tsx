@@ -14,9 +14,11 @@ import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
 import {
+  DialogClose,
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -595,24 +597,33 @@ export default function DisciplineDetailPage() {
       <ToastOnError error={queryError} />
 
       <div className="flex justify-end">
-        <Button
-          type="button"
-          variant="destructive"
-          size="sm"
-          disabled={deleteDisciplineMutation.isPending}
-          onClick={() => {
-            if (
-              !window.confirm(
-                "Excluir esta disciplina? A turma, convites e vínculos associados podem ser removidos."
-              )
-            ) {
-              return;
-            }
-            deleteDisciplineMutation.mutate();
-          }}
-        >
-          {deleteDisciplineMutation.isPending ? "Removendo..." : "Excluir disciplina"}
-        </Button>
+        <Dialog>
+          <DialogTrigger render={<Button type="button" variant="destructive" size="sm" />}>
+            Excluir disciplina
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Excluir disciplina</DialogTitle>
+              <DialogDescription>
+                Esta ação remove a disciplina atual. A turma, convites e vínculos
+                associados também podem ser removidos.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <DialogClose render={<Button type="button" variant="outline" />}>
+                Cancelar
+              </DialogClose>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deleteDisciplineMutation.isPending}
+                onClick={() => deleteDisciplineMutation.mutate()}
+              >
+                {deleteDisciplineMutation.isPending ? "Removendo..." : "Confirmar exclusão"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

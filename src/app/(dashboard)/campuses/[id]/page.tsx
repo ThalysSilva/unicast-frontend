@@ -11,6 +11,16 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiMutation } from "@/hooks/use-api-mutation";
@@ -195,25 +205,44 @@ export default function CampusDetailPage() {
               >
                 Voltar
               </Link>
-              <button
-                type="button"
-                disabled={deleteCampusMutation.isPending}
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      "Excluir este campus? Cursos e disciplinas vinculados também podem ser removidos."
-                    )
-                  ) {
-                    return;
+              <Dialog>
+                <DialogTrigger
+                  render={
+                    <button
+                      type="button"
+                      className={cn(
+                        buttonVariants({ variant: "destructive", size: "sm" })
+                      )}
+                    />
                   }
-                  deleteCampusMutation.mutate();
-                }}
-                className={cn(
-                  buttonVariants({ variant: "destructive", size: "sm" })
-                )}
-              >
-                {deleteCampusMutation.isPending ? "Removendo..." : "Excluir campus"}
-              </button>
+                >
+                  Excluir campus
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Excluir campus</DialogTitle>
+                    <DialogDescription>
+                      Esta ação remove o campus atual. Cursos e disciplinas vinculados
+                      também podem ser removidos.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <DialogClose
+                      render={<button type="button" className={cn(buttonVariants({ variant: "outline" }))}></button>}
+                    >
+                      Cancelar
+                    </DialogClose>
+                    <button
+                      type="button"
+                      disabled={deleteCampusMutation.isPending}
+                      onClick={() => deleteCampusMutation.mutate()}
+                      className={cn(buttonVariants({ variant: "destructive" }))}
+                    >
+                      {deleteCampusMutation.isPending ? "Removendo..." : "Confirmar exclusão"}
+                    </button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 

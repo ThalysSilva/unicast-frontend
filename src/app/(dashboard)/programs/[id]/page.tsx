@@ -15,6 +15,16 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
 import { useApiMutation } from "@/hooks/use-api-mutation";
@@ -248,25 +258,44 @@ export default function ProgramDetailPage() {
               >
                 Voltar
               </Link>
-              <button
-                type="button"
-                disabled={deleteProgramMutation.isPending}
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      "Excluir este curso? Todas as disciplinas vinculadas também podem ser removidas."
-                    )
-                  ) {
-                    return;
+              <Dialog>
+                <DialogTrigger
+                  render={
+                    <button
+                      type="button"
+                      className={cn(
+                        buttonVariants({ variant: "destructive", size: "sm" })
+                      )}
+                    />
                   }
-                  deleteProgramMutation.mutate();
-                }}
-                className={cn(
-                  buttonVariants({ variant: "destructive", size: "sm" })
-                )}
-              >
-                {deleteProgramMutation.isPending ? "Removendo..." : "Excluir curso"}
-              </button>
+                >
+                  Excluir curso
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Excluir curso</DialogTitle>
+                    <DialogDescription>
+                      Esta ação remove o curso atual. Todas as disciplinas vinculadas
+                      também podem ser removidas.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <DialogClose
+                      render={<button type="button" className={cn(buttonVariants({ variant: "outline" }))}></button>}
+                    >
+                      Cancelar
+                    </DialogClose>
+                    <button
+                      type="button"
+                      disabled={deleteProgramMutation.isPending}
+                      onClick={() => deleteProgramMutation.mutate()}
+                      className={cn(buttonVariants({ variant: "destructive" }))}
+                    >
+                      {deleteProgramMutation.isPending ? "Removendo..." : "Confirmar exclusão"}
+                    </button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 
