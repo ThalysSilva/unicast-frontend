@@ -100,7 +100,9 @@ const refreshBackendToken = async (token: {
   }
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export { refreshBackendToken };
+
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   trustHost: true,
   session: { strategy: "jwt" },
   providers: [
@@ -142,12 +144,42 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.accessToken = user.accessToken;
         token.refreshToken = user.refreshToken;
         token.accessTokenExpiresAt = user.accessTokenExpiresAt;
         token.jwe = user.jwe;
+      }
+
+      if (trigger === "update" && session) {
+        const updated = session as {
+          accessToken?: string;
+          refreshToken?: string;
+          accessTokenExpiresAt?: number;
+          jwe?: string;
+          error?: "RefreshTokenError" | "RefreshTokenMissing";
+        };
+
+        if (typeof updated.accessToken !== "undefined") {
+          token.accessToken = updated.accessToken;
+        }
+        if (typeof updated.refreshToken !== "undefined") {
+          token.refreshToken = updated.refreshToken;
+        }
+        if (typeof updated.accessTokenExpiresAt !== "undefined") {
+          token.accessTokenExpiresAt = updated.accessTokenExpiresAt;
+        }
+        if (typeof updated.jwe !== "undefined") {
+          token.jwe = updated.jwe;
+        }
+        if (typeof updated.error !== "undefined") {
+          token.error = updated.error;
+        } else {
+          delete token.error;
+        }
+
+        return token;
       }
 
       if (

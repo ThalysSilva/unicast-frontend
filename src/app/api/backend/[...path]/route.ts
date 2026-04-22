@@ -1,12 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { refreshBackendToken, unstable_update } from "@/auth";
 
 const DEFAULT_BACKEND_URL = "http://localhost:8080";
 const DEFAULT_APP_URL = "http://localhost:3000";
 
 type BackendToken = {
   accessToken?: string;
+  refreshToken?: string;
+  accessTokenExpiresAt?: number;
   jwe?: string;
+  error?: "RefreshTokenError" | "RefreshTokenMissing";
 };
 
 const PUBLIC_PATHS = [
@@ -73,6 +77,22 @@ const shouldInjectJwe = (method: string, path: string) =>
 const buildBackendUrl = (path: string, search: string) =>
   `${backendBaseUrl()}${path}${search}`;
 
+const refreshSessionToken = async (token: BackendToken) => {
+  const refreshed = await refreshBackendToken(token);
+  if (!refreshed.accessToken || !refreshed.refreshToken || refreshed.error) {
+    return null;
+  }
+
+  await unstable_update({
+    accessToken: refreshed.accessToken,
+    refreshToken: refreshed.refreshToken,
+    accessTokenExpiresAt: refreshed.accessTokenExpiresAt,
+    jwe: refreshed.jwe,
+  } as never);
+
+  return refreshed as BackendToken;
+};
+
 const buildHeaders = (request: NextRequest, token: BackendToken | null) => {
   const headers = new Headers(request.headers);
   headers.delete("host");
@@ -127,12 +147,20 @@ const proxy = async (
   const params = await context.params;
   const path = `/${params.path.join("/")}`;
   const isPublic = shouldAllowPublic(path);
-  const token = isPublic
+  let token = isPublic
     ? null
     : ((await getToken({
         req: request,
         secret: process.env.AUTH_SECRET,
       })) as BackendToken | null);
+
+  if (
+    !isPublic &&
+    token?.accessTokenExpiresAt &&
+    Date.now() >= token.accessTokenExpiresAt - 60_000
+  ) {
+    token = await refreshSessionToken(token);
+  }
 
   if (!isPublic && !token?.accessToken) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
