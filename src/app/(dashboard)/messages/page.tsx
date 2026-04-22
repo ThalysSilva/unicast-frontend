@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 
@@ -132,22 +133,15 @@ type MessageFormValues = {
 };
 
 export default function MessagesPage() {
+  const searchParams = useSearchParams();
   const [selected, setSelected] = useState<string[]>([]);
   const [selectedCampusIds, setSelectedCampusIds] = useState<string[]>([]);
-  const [selectedDisciplineIds, setSelectedDisciplineIds] = useState<string[]>(
-    () => {
-      if (typeof window === "undefined") return [];
-
-      const requestedDisciplineId = new URLSearchParams(
-        window.location.search
-      ).get("disciplineId");
-      return requestedDisciplineId ? [requestedDisciplineId] : [];
-    }
-  );
+  const [selectedDisciplineIds, setSelectedDisciplineIds] = useState<string[]>([]);
   const [excludedDisciplineIds, setExcludedDisciplineIds] = useState<string[]>([]);
   const [recipientsDialogOpen, setRecipientsDialogOpen] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState("");
   const { showToast } = useToast();
+  const requestedDisciplineId = searchParams.get("disciplineId") ?? "";
 
   const form = useForm<MessageFormValues>({
     defaultValues: {
@@ -446,6 +440,25 @@ export default function MessagesPage() {
 
     await sendMessageMutation.mutateAsync(values);
   };
+
+  useEffect(() => {
+    if (!requestedDisciplineId) {
+      return;
+    }
+
+    const requestedDiscipline = disciplines.find(
+      (discipline) => discipline.id === requestedDisciplineId
+    );
+    if (!requestedDiscipline) {
+      return;
+    }
+
+    setSelectedCampusIds([]);
+    setExcludedDisciplineIds([]);
+    setSelectedDisciplineIds((prev) =>
+      sameSelection(prev, [requestedDisciplineId]) ? prev : [requestedDisciplineId]
+    );
+  }, [disciplines, requestedDisciplineId]);
 
   useEffect(() => {
     const next = students.map((student) => student.id).sort();
