@@ -11,14 +11,21 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast-provider";
-import { apiRequest } from "@/lib/api";
+import { ApiError, apiRequest } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const schema = z.object({
-  name: z.string().min(2, "Informe o nome"),
-  email: z.string().email("Informe um email válido"),
-  password: z.string().min(6, "Senha mínima de 6 caracteres"),
-});
+const schema = z
+  .object({
+    name: z.string().min(2, "Informe o nome"),
+    email: z.string().email("Informe um email válido"),
+    password: z.string().min(6, "Senha mínima de 6 caracteres"),
+    confirmPassword: z.string().min(1, "Confirme a senha"),
+    registrationKey: z.string().trim().min(1, "Informe o código de registro"),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    message: "As senhas não coincidem",
+    path: ["confirmPassword"],
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -33,15 +40,32 @@ export default function RegisterPage() {
 
   const onSubmit = async (values: FormValues) => {
     try {
-      await apiRequest("/auth/register", { method: "POST", body: values });
+      await apiRequest("/auth/register", {
+        method: "POST",
+        body: {
+          name: values.name,
+          email: values.email,
+          password: values.password,
+          registrationKey: values.registrationKey,
+        },
+      });
       showToast({
         title: "Cadastro realizado. Você já pode entrar.",
         variant: "success",
       });
       setTimeout(() => router.push("/login"), 800);
     } catch (err) {
+      const message =
+        err instanceof ApiError &&
+        err.status === 403 &&
+        /invalid registration key/i.test(err.message)
+          ? "Código de registro inválido"
+          : err instanceof Error
+            ? err.message
+            : "Falha ao cadastrar";
+
       showToast({
-        title: err instanceof Error ? err.message : "Falha ao cadastrar",
+        title: message,
         variant: "error",
       });
     }
@@ -58,7 +82,7 @@ export default function RegisterPage() {
             Criar conta
           </h1>
           <p className="text-sm text-muted-foreground">
-            Use seu email institucional para acessar o painel.
+            Use seu email institucional e o código de registro para acessar o painel.
           </p>
         </div>
         <FormProvider {...form}>
@@ -76,7 +100,18 @@ export default function RegisterPage() {
               label="Email"
               placeholder="prof@escola.com"
             />
+            <FormInput<FormValues>
+              name="registrationKey"
+              label="Código de registro"
+              type="password"
+              placeholder="Informe o código fornecido"
+            />
             <FormInput<FormValues> name="password" label="Senha" type="password" />
+            <FormInput<FormValues>
+              name="confirmPassword"
+              label="Confirmar senha"
+              type="password"
+            />
             <Button type="submit" size="lg" disabled={isSubmitting}>
               {isSubmitting ? "Criando..." : "Criar conta"}
             </Button>
