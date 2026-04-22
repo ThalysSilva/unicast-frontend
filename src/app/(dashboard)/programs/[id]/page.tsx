@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 
@@ -17,6 +17,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
+import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest } from "@/lib/api";
 import { loadAcademicStructure } from "@/lib/academic-structure";
@@ -42,6 +43,7 @@ const semesterOptions = [
 export default function ProgramDetailPage() {
   const params = useParams<{ id: string }>();
   const programId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const router = useRouter();
   const { showToast } = useToast();
 
   const form = useForm<DisciplineFormValues>({
@@ -91,6 +93,24 @@ export default function ProgramDetailPage() {
     });
     await structureQuery.refetch();
   };
+
+  const deleteProgramMutation = useApiMutation<ApiMessage, void>({
+    mutationFn: () =>
+      apiRequest<ApiMessage>(`/program/${programId}`, {
+        method: "DELETE",
+      }),
+    invalidateQueryKeys: [["academic-structure"]],
+    onSuccess: (res) => {
+      showToast({
+        title: res.message ?? "Curso removido com sucesso",
+        variant: "success",
+      });
+      if (program) {
+        router.push(`/campuses/${program.campusId}`);
+        router.refresh();
+      }
+    },
+  });
 
   if (structureQuery.isLoading) {
     return <LoadingState label="Carregando curso..." />;
@@ -221,12 +241,33 @@ export default function ProgramDetailPage() {
                 Abra uma disciplina para ver a turma, convite e matrículas.
               </p>
             </div>
-            <Link
-              href={`/campuses/${program.campusId}`}
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-            >
-              Voltar
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/campuses/${program.campusId}`}
+                className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+              >
+                Voltar
+              </Link>
+              <button
+                type="button"
+                disabled={deleteProgramMutation.isPending}
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Excluir este curso? Todas as disciplinas vinculadas também podem ser removidas."
+                    )
+                  ) {
+                    return;
+                  }
+                  deleteProgramMutation.mutate();
+                }}
+                className={cn(
+                  buttonVariants({ variant: "destructive", size: "sm" })
+                )}
+              >
+                {deleteProgramMutation.isPending ? "Removendo..." : "Excluir curso"}
+              </button>
+            </div>
           </div>
 
           <div className="mt-5 grid max-h-[560px] gap-3 overflow-y-auto pr-1">

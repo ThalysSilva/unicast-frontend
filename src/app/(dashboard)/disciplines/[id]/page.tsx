@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 
@@ -84,6 +84,7 @@ const toStudentArray = (value: unknown): Student[] =>
 export default function DisciplineDetailPage() {
   const params = useParams<{ id: string }>();
   const disciplineId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const router = useRouter();
   const [origin] = useState(() =>
     typeof window === "undefined" ? "" : window.location.origin
   );
@@ -190,6 +191,23 @@ export default function DisciplineDetailPage() {
         variant: "success",
       });
       await Promise.all([invitesQuery.refetch(), inviteQuery.refetch()]);
+    },
+  });
+  const deleteDisciplineMutation = useApiMutation<ApiMessage, void>({
+    mutationFn: () =>
+      apiRequest<ApiMessage>(`/discipline/${disciplineId}`, {
+        method: "DELETE",
+      }),
+    invalidateQueryKeys: [["academic-structure"], queryKeys.students()],
+    onSuccess: (res) => {
+      showToast({
+        title: res.message ?? "Disciplina removida com sucesso",
+        variant: "success",
+      });
+      if (discipline) {
+        router.push(`/programs/${discipline.programId}`);
+        router.refresh();
+      }
     },
   });
 
@@ -575,6 +593,27 @@ export default function DisciplineDetailPage() {
         ]}
       />
       <ToastOnError error={queryError} />
+
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          disabled={deleteDisciplineMutation.isPending}
+          onClick={() => {
+            if (
+              !window.confirm(
+                "Excluir esta disciplina? A turma, convites e vínculos associados podem ser removidos."
+              )
+            ) {
+              return;
+            }
+            deleteDisciplineMutation.mutate();
+          }}
+        >
+          {deleteDisciplineMutation.isPending ? "Removendo..." : "Excluir disciplina"}
+        </Button>
+      </div>
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Card className="rounded-2xl border border-border/60 bg-white/90 px-4 py-3">

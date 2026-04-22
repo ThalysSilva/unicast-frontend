@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 
@@ -13,6 +13,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ToastOnError, useToast } from "@/components/ui/toast-provider";
+import { useApiMutation } from "@/hooks/use-api-mutation";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { apiRequest } from "@/lib/api";
 import { loadAcademicStructure } from "@/lib/academic-structure";
@@ -29,6 +30,7 @@ type ProgramFormValues = {
 export default function CampusDetailPage() {
   const params = useParams<{ id: string }>();
   const campusId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const router = useRouter();
   const { showToast } = useToast();
 
   const form = useForm<ProgramFormValues>({
@@ -70,6 +72,22 @@ export default function CampusDetailPage() {
     form.reset({ name: "", description: "", active: true });
     await structureQuery.refetch();
   };
+
+  const deleteCampusMutation = useApiMutation<ApiMessage, void>({
+    mutationFn: () =>
+      apiRequest<ApiMessage>(`/campus/${campusId}`, {
+        method: "DELETE",
+      }),
+    invalidateQueryKeys: [["academic-structure"]],
+    onSuccess: (res) => {
+      showToast({
+        title: res.message ?? "Campus removido com sucesso",
+        variant: "success",
+      });
+      router.push("/setup");
+      router.refresh();
+    },
+  });
 
   if (structureQuery.isLoading) {
     return <LoadingState label="Carregando campus..." />;
@@ -170,12 +188,33 @@ export default function CampusDetailPage() {
                 Abra um curso para cadastrar disciplinas e acompanhar as turmas.
               </p>
             </div>
-            <Link
-              href="/setup"
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-            >
-              Voltar
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/setup"
+                className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+              >
+                Voltar
+              </Link>
+              <button
+                type="button"
+                disabled={deleteCampusMutation.isPending}
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Excluir este campus? Cursos e disciplinas vinculados também podem ser removidos."
+                    )
+                  ) {
+                    return;
+                  }
+                  deleteCampusMutation.mutate();
+                }}
+                className={cn(
+                  buttonVariants({ variant: "destructive", size: "sm" })
+                )}
+              >
+                {deleteCampusMutation.isPending ? "Removendo..." : "Excluir campus"}
+              </button>
+            </div>
           </div>
 
           <div className="mt-5 grid max-h-[560px] gap-3 overflow-y-auto pr-1">
