@@ -51,6 +51,10 @@ const EMPTY_STUDENTS: AudienceStudent[] = [];
 const EMPTY_DISCIPLINES: AcademicDiscipline[] = [];
 const EMPTY_SMTP: SmtpInstance[] = [];
 const EMPTY_WHATSAPP: WhatsappInstance[] = [];
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_EMAIL_ATTACHMENTS_BYTES = 25 * 1024 * 1024;
+const MAX_WHATSAPP_ATTACHMENTS_BYTES = 15 * 1024 * 1024;
 
 const toStudentArray = (value: unknown): Student[] =>
   Array.isArray(value) ? value : [];
@@ -132,6 +136,54 @@ type MessageFormValues = {
   whatsapp_id: string;
 };
 
+type MessageAttachment = {
+  fileName: string;
+  data: string;
+  size: number;
+};
+
+type MessageSendPayload = MessageFormValues & {
+  attachments?: Array<Pick<MessageAttachment, "fileName" | "data">>;
+};
+
+const formatFileSize = (value: number) => {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const fileToBase64 = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("Falha ao converter anexo"));
+        return;
+      }
+
+      const [, encoded = ""] = result.split(",", 2);
+      resolve(encoded);
+    };
+    reader.onerror = () => reject(new Error("Falha ao ler anexo"));
+    reader.readAsDataURL(file);
+  });
+
+const attachmentsLimitLabel = (values: MessageFormValues) => {
+  if (values.whatsapp_id) {
+    return {
+      bytes: MAX_WHATSAPP_ATTACHMENTS_BYTES,
+      message: `Os anexos excedem o limite total de ${formatFileSize(MAX_WHATSAPP_ATTACHMENTS_BYTES)} para envios com WhatsApp`,
+    };
+  }
+
+  return {
+    bytes: MAX_EMAIL_ATTACHMENTS_BYTES,
+    message: `Os anexos excedem o limite total de ${formatFileSize(MAX_EMAIL_ATTACHMENTS_BYTES)} para envios por email`,
+  };
+};
+
 export default function MessagesPage() {
   const searchParams = useSearchParams();
   const [selected, setSelected] = useState<string[]>([]);
@@ -140,6 +192,9 @@ export default function MessagesPage() {
   const [excludedDisciplineIds, setExcludedDisciplineIds] = useState<string[]>([]);
   const [recipientsDialogOpen, setRecipientsDialogOpen] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState("");
+  const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
+  const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
+  const [isProcessingAttachments, setIsProcessingAttachments] = useState(false);
   const { showToast } = useToast();
   const requestedDisciplineId = searchParams.get("disciplineId") ?? "";
 
@@ -248,10 +303,7 @@ export default function MessagesPage() {
     },
   });
 
-  const sendMessageMutation = useApiMutation<
-    ApiMessage,
-    MessageFormValues
-  >({
+  const sendMessageMutation = useApiMutation<ApiMessage, MessageSendPayload>({
     mutationFn: async (values) =>
       apiRequest<ApiMessage>("/message/send", {
         method: "POST",
@@ -262,6 +314,8 @@ export default function MessagesPage() {
       }),
     onSuccess: (res) => {
       showToast({ title: res.message ?? "Mensagem enviada", variant: "success" });
+      setAttachments([]);
+      setAttachmentsError(null);
     },
   });
 
@@ -378,7 +432,10 @@ export default function MessagesPage() {
   const hasWhatsapp = whatsappOptions.length > 0;
   const hasAnyIntegration = hasSmtp || hasWhatsapp;
   const isSendBlocked =
-    isLoading || sendMessageMutation.isPending || !hasAnyIntegration;
+    isLoading ||
+    sendMessageMutation.isPending ||
+    isProcessingAttachments ||
+    !hasAnyIntegration;
   const hasScope = selectedScopeDisciplineIds.length > 0;
   const campusDisciplines = (campusId: string) =>
     disciplines.filter((discipline) => discipline.campusId === campusId);
@@ -415,6 +472,63 @@ export default function MessagesPage() {
   const recipientsSummary = hasScope
     ? `${selectedScopeDisciplineIds.length} disciplina(s), ${selectedCampusCount} campus, ${students.length} aluno(s)`
     : "Nenhum filtro selecionado";
+  const totalAttachmentBytes = useMemo(
+    () => attachments.reduce((total, item) => total + item.size, 0),
+    [attachments]
+  );
+
+  const handleAttachmentChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const nextFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+
+    if (!nextFiles.length) {
+      return;
+    }
+
+    if (attachments.length + nextFiles.length > MAX_ATTACHMENTS) {
+      const message = `Envie no máximo ${MAX_ATTACHMENTS} anexos por mensagem`;
+      setAttachmentsError(message);
+      showToast({ title: message, variant: "error" });
+      return;
+    }
+
+    const oversizedFile = nextFiles.find((file) => file.size > MAX_ATTACHMENT_BYTES);
+    if (oversizedFile) {
+      const message = `${oversizedFile.name} excede o limite de ${formatFileSize(MAX_ATTACHMENT_BYTES)} por arquivo`;
+      setAttachmentsError(message);
+      showToast({ title: message, variant: "error" });
+      return;
+    }
+
+    setIsProcessingAttachments(true);
+    setAttachmentsError(null);
+
+    try {
+      const encodedFiles = await Promise.all(
+        nextFiles.map(async (file) => ({
+          fileName: file.name,
+          data: await fileToBase64(file),
+          size: file.size,
+        }))
+      );
+
+      setAttachments((prev) => [...prev, ...encodedFiles]);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Falha ao processar anexos";
+      setAttachmentsError(message);
+      showToast({ title: message, variant: "error" });
+    } finally {
+      setIsProcessingAttachments(false);
+    }
+  };
+
+  const removeAttachment = (fileName: string) => {
+    setAttachments((prev) => prev.filter((attachment) => attachment.fileName !== fileName));
+    setAttachmentsError(null);
+  };
 
   const handleSend = async (values: MessageFormValues) => {
     if (!hasAnyIntegration) {
@@ -438,7 +552,27 @@ export default function MessagesPage() {
       return;
     }
 
-    await sendMessageMutation.mutateAsync(values);
+    if (isProcessingAttachments) {
+      showToast({
+        title: "Aguarde o processamento dos anexos antes de enviar",
+        variant: "error",
+      });
+      return;
+    }
+
+    const attachmentLimit = attachmentsLimitLabel(values);
+    if (totalAttachmentBytes > attachmentLimit.bytes) {
+      setAttachmentsError(attachmentLimit.message);
+      showToast({ title: attachmentLimit.message, variant: "error" });
+      return;
+    }
+
+    await sendMessageMutation.mutateAsync({
+      ...values,
+      attachments: attachments.length
+        ? attachments.map(({ fileName, data }) => ({ fileName, data }))
+        : undefined,
+    });
   };
 
   useEffect(() => {
@@ -816,6 +950,64 @@ export default function MessagesPage() {
                   validate: requiredTrimmed("Escreva a mensagem"),
                 }}
               />
+              <div className="space-y-2">
+                <Label htmlFor="attachments">Anexos</Label>
+                <Input
+                  id="attachments"
+                  type="file"
+                  multiple
+                  disabled={isSendBlocked}
+                  onChange={handleAttachmentChange}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Até {MAX_ATTACHMENTS} arquivos, {formatFileSize(MAX_ATTACHMENT_BYTES)} por anexo.
+                  O total vai até {formatFileSize(MAX_EMAIL_ATTACHMENTS_BYTES)} por email e{" "}
+                  {formatFileSize(MAX_WHATSAPP_ATTACHMENTS_BYTES)} quando houver envio por WhatsApp.
+                </p>
+                {attachmentsError ? (
+                  <p className="text-xs text-destructive">{attachmentsError}</p>
+                ) : null}
+                {isProcessingAttachments ? (
+                  <p className="text-xs text-muted-foreground">
+                    Processando anexos...
+                  </p>
+                ) : null}
+                {attachments.length ? (
+                  <div className="grid gap-2">
+                    {attachments.map((attachment) => (
+                      <div
+                        key={`${attachment.fileName}-${attachment.size}`}
+                        className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
+                      >
+                        <div className="min-w-0 overflow-hidden">
+                          <p
+                            className="overflow-hidden text-ellipsis whitespace-nowrap font-medium"
+                            title={attachment.fileName}
+                          >
+                            {attachment.fileName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(attachment.size)}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 self-center"
+                          disabled={isSendBlocked}
+                          onClick={() => removeAttachment(attachment.fileName)}
+                        >
+                          Remover
+                        </Button>
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground">
+                      Total anexado: {formatFileSize(totalAttachmentBytes)}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
                   {selectedCount} aluno(s) selecionado(s)
