@@ -46,6 +46,21 @@ export type Student = {
   whatsappDeliveryIssue?: boolean;
 };
 
+export type DeliverySnapshot = {
+  channel: string;
+  success: boolean;
+  errorText?: string;
+  senderType?: string;
+  senderProvider?: string;
+  senderAddress?: string;
+  createdAt: string;
+};
+
+export type DeliverySummary = {
+  email?: DeliverySnapshot | null;
+  whatsApp?: DeliverySnapshot | null;
+};
+
 export type SmtpInstance = {
   id: string;
   host: string;

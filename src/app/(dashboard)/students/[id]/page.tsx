@@ -48,6 +48,8 @@ import {
 import type {
   ApiMessage,
   ApiResponse,
+  DeliverySnapshot,
+  DeliverySummary,
   Student,
   StudentStatus,
 } from "@/lib/types";
@@ -95,6 +97,28 @@ const formFromStudent = (student: Student): StudentForm => ({
 const nullableValue = (value: string) => {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+};
+
+const formatDeliveryTimestamp = (value?: string) => {
+  if (!value) return "Sem registros";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Sem registros";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+};
+
+const deliveryStatusLabel = (snapshot?: DeliverySnapshot | null) => {
+  if (!snapshot) return "Sem registros";
+  return snapshot.success ? "Último envio com sucesso" : "Último envio com falha";
+};
+
+const deliveryVariant = (snapshot?: DeliverySnapshot | null) => {
+  if (!snapshot) return "outline" as const;
+  return snapshot.success ? "secondary" as const : "destructive" as const;
 };
 
 export default function StudentDetailPage() {
@@ -145,6 +169,17 @@ export default function StudentDetailPage() {
     },
   });
 
+  const deliverySummaryQuery = useApiQuery({
+    queryKey: ["student-delivery-summary", { studentId }],
+    enabled: Boolean(studentId),
+    queryFn: async () => {
+      const response = await apiRequest<ApiResponse<DeliverySummary>>(
+        `/student/${studentId}/delivery-summary`
+      );
+      return extractData(response);
+    },
+  });
+
   const updateStudentMutation = useApiMutation<ApiMessage, StudentForm>({
     mutationFn: async (values) =>
       apiRequest<ApiMessage>(`/student/${studentId}`, {
@@ -162,6 +197,7 @@ export default function StudentDetailPage() {
       queryKeys.students.root(),
       queryKeys.dashboard.summary(),
       ["student", { studentId }],
+      ["student-delivery-summary", { studentId }],
     ],
     onSuccess: async (res) => {
       showToast({
@@ -210,9 +246,15 @@ export default function StudentDetailPage() {
   const isLoading =
     studentQuery.isLoading ||
     structureQuery.isLoading ||
-    enrollmentsQuery.isLoading;
+    enrollmentsQuery.isLoading ||
+    deliverySummaryQuery.isLoading;
   const queryError =
-    studentQuery.error ?? structureQuery.error ?? enrollmentsQuery.error ?? null;
+    studentQuery.error ??
+    structureQuery.error ??
+    enrollmentsQuery.error ??
+    deliverySummaryQuery.error ??
+    null;
+  const deliverySummary = deliverySummaryQuery.data;
 
   useEffect(() => {
     if (student) {
@@ -363,83 +405,144 @@ export default function StudentDetailPage() {
           </FormProvider>
         </Card>
 
-        <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Vínculos com disciplinas</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Desvincular remove o aluno apenas daquela disciplina.
-              </p>
+        <div className="grid gap-6">
+          <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Entrega recente</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Último resultado de envio por canal para este aluno.
+                </p>
+              </div>
             </div>
-            <Badge variant="outline">{enrollments.length} vínculo(s)</Badge>
-          </div>
 
-          <div className="mt-5 max-h-[520px] overflow-auto rounded-2xl border border-border/60">
-            {isLoading ? (
-              <LoadingState label="Carregando vínculos..." className="rounded-none border-0" />
-            ) : enrollments.length ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Disciplina</TableHead>
-                    <TableHead>Campus</TableHead>
-                    <TableHead>Período</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {enrollments.map((discipline) => (
-                    <TableRow key={discipline.id}>
-                      <TableCell>
-                        <Link
-                          href={`/disciplines/${discipline.id}`}
-                          className="font-medium text-foreground hover:underline"
-                        >
-                          {discipline.name}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">
-                          {discipline.programName}
-                        </p>
-                      </TableCell>
-                      <TableCell>{discipline.campusName}</TableCell>
-                      <TableCell>
-                        {discipline.year}.{discipline.semester}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          disabled={
-                            unlinkMutation.isPending &&
-                            unlinkMutation.variables?.disciplineId === discipline.id
-                          }
-                          onClick={() =>
-                            unlinkMutation.mutate({
-                              disciplineId: discipline.id,
-                              disciplineName: discipline.name,
-                            })
-                          }
-                        >
-                          {unlinkMutation.isPending &&
-                          unlinkMutation.variables?.disciplineId === discipline.id
-                            ? "Desvinculando..."
-                            : "Desvincular"}
-                        </Button>
-                      </TableCell>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              {[
+                {
+                  title: "Email",
+                  snapshot: deliverySummary?.email,
+                },
+                {
+                  title: "WhatsApp",
+                  snapshot: deliverySummary?.whatsApp,
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-2xl border border-border/60 bg-background/70 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">{item.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatDeliveryTimestamp(item.snapshot?.createdAt)}
+                      </p>
+                    </div>
+                    <Badge variant={deliveryVariant(item.snapshot)}>
+                      {deliveryStatusLabel(item.snapshot)}
+                    </Badge>
+                  </div>
+
+                  {item.snapshot?.senderAddress ? (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Remetente: {item.snapshot.senderAddress}
+                    </p>
+                  ) : null}
+                  {item.snapshot?.senderType || item.snapshot?.senderProvider ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {[item.snapshot?.senderType, item.snapshot?.senderProvider]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  ) : null}
+                  {item.snapshot?.errorText ? (
+                    <p className="mt-3 text-sm text-destructive">
+                      {item.snapshot.errorText}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="rounded-3xl border border-border/60 bg-white/90 p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Vínculos com disciplinas</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Desvincular remove o aluno apenas daquela disciplina.
+                </p>
+              </div>
+              <Badge variant="outline">{enrollments.length} vínculo(s)</Badge>
+            </div>
+
+            <div className="mt-5 max-h-[520px] overflow-auto rounded-2xl border border-border/60">
+              {isLoading ? (
+                <LoadingState label="Carregando vínculos..." className="rounded-none border-0" />
+              ) : enrollments.length ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Disciplina</TableHead>
+                      <TableHead>Campus</TableHead>
+                      <TableHead>Período</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <EmptyState
-                title="Nenhum vínculo encontrado"
-                description="Adicione ou importe a matrícula em uma disciplina para criar o vínculo."
-                className="rounded-none border-0"
-              />
-            )}
-          </div>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {enrollments.map((discipline) => (
+                      <TableRow key={discipline.id}>
+                        <TableCell>
+                          <Link
+                            href={`/disciplines/${discipline.id}`}
+                            className="font-medium text-foreground hover:underline"
+                          >
+                            {discipline.name}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">
+                            {discipline.programName}
+                          </p>
+                        </TableCell>
+                        <TableCell>{discipline.campusName}</TableCell>
+                        <TableCell>
+                          {discipline.year}.{discipline.semester}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            disabled={
+                              unlinkMutation.isPending &&
+                              unlinkMutation.variables?.disciplineId === discipline.id
+                            }
+                            onClick={() =>
+                              unlinkMutation.mutate({
+                                disciplineId: discipline.id,
+                                disciplineName: discipline.name,
+                              })
+                            }
+                          >
+                            {unlinkMutation.isPending &&
+                            unlinkMutation.variables?.disciplineId === discipline.id
+                              ? "Desvinculando..."
+                              : "Desvincular"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <EmptyState
+                  title="Nenhum vínculo encontrado"
+                  description="Adicione ou importe a matrícula em uma disciplina para criar o vínculo."
+                  className="rounded-none border-0"
+                />
+              )}
+            </div>
+          </Card>
+        </div>
       </section>
     </div>
   );
