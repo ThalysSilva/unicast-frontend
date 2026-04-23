@@ -592,7 +592,10 @@ export default function MessagesPage() {
   const studentsWithContext = useMemo(
     () =>
       students.map((student) => {
-        const recentIssue = recentDeliveryIssues[student.id];
+        const recentIssue = recentDeliveryIssues[student.id] ?? {
+          emailFailed: student.emailDeliveryIssue ?? false,
+          whatsappFailed: student.whatsappDeliveryIssue ?? false,
+        };
         const canReceiveByEmail = hasEmailContact(student);
         const canReceiveByWhatsapp = hasPhoneContact(student);
         const canReceiveCurrentSend =

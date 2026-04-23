@@ -6,6 +6,7 @@ import { useEffect, useMemo } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 
 import {
+  FormCheckbox,
   FormEmailInput,
   FormInput,
   FormPhoneInput,
@@ -55,6 +56,7 @@ type StudentForm = {
   name: string;
   email: string;
   phone: string;
+  noPhone: boolean;
   annotation: string;
   status: StudentStatus;
 };
@@ -76,6 +78,7 @@ const emptyForm = (): StudentForm => ({
   name: "",
   email: "",
   phone: "",
+  noPhone: false,
   annotation: "",
   status: "PENDING",
 });
@@ -84,6 +87,7 @@ const formFromStudent = (student: Student): StudentForm => ({
   name: student.name ?? "",
   email: student.email ?? "",
   phone: formatInternationalPhoneInput(student.phone ?? ""),
+  noPhone: student.noPhone ?? false,
   annotation: student.annotation ?? "",
   status: student.status ?? "PENDING",
 });
@@ -98,6 +102,7 @@ export default function StudentDetailPage() {
   const studentId = Array.isArray(params.id) ? params.id[0] : params.id;
   const form = useForm<StudentForm>({ defaultValues: emptyForm() });
   const { showToast } = useToast();
+  const noPhone = form.watch("noPhone");
 
   const studentQuery = useApiQuery({
     queryKey: ["student", { studentId }],
@@ -147,7 +152,8 @@ export default function StudentDetailPage() {
         body: {
           name: nullableValue(values.name),
           email: nullableValue(values.email),
-          phone: nullableValue(normalizePhone(values.phone)),
+          phone: values.noPhone ? null : nullableValue(normalizePhone(values.phone)),
+          noPhone: values.noPhone,
           annotation: nullableValue(values.annotation),
           status: values.status,
         },
@@ -213,6 +219,13 @@ export default function StudentDetailPage() {
       form.reset(formFromStudent(student));
     }
   }, [form, student]);
+
+  useEffect(() => {
+    if (noPhone) {
+      form.setValue("phone", "");
+      form.clearErrors("phone");
+    }
+  }, [form, noPhone]);
 
   const handleSave = async (values: StudentForm) =>
     updateStudentMutation.mutateAsync(values);
@@ -302,10 +315,24 @@ export default function StudentDetailPage() {
                 <FormPhoneInput<StudentForm>
                   name="phone"
                   label="Telefone"
-                  disabled={updateStudentMutation.isPending}
-                  rules={optionalPhoneRules()}
+                  disabled={updateStudentMutation.isPending || noPhone}
+                  helper={
+                    noPhone
+                      ? "Marcado como sem número de contato."
+                      : undefined
+                  }
+                  rules={{
+                    validate: (value?: string) =>
+                      noPhone || optionalPhoneRules().validate(value),
+                  }}
                 />
               </div>
+              <FormCheckbox<StudentForm>
+                name="noPhone"
+                label="Aluno não possui número de contato"
+                description="Permite manter o aluno ativo apenas com email válido."
+                disabled={updateStudentMutation.isPending}
+              />
               <FormSelect<StudentForm>
                 name="status"
                 label="Status acadêmico"

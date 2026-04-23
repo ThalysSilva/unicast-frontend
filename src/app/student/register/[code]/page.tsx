@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { CheckCircle2 } from "lucide-react";
 
@@ -24,6 +24,7 @@ type StudentRegisterForm = {
   name: string;
   email: string;
   phone: string;
+  noPhone: boolean;
   consent: boolean;
 };
 
@@ -39,9 +40,18 @@ export default function StudentRegisterPage() {
       name: "",
       email: "",
       phone: "",
+      noPhone: false,
       consent: false,
     },
   });
+  const noPhone = form.watch("noPhone");
+
+  useEffect(() => {
+    if (noPhone) {
+      form.setValue("phone", "");
+      form.clearErrors("phone");
+    }
+  }, [form, noPhone]);
 
   const handleSubmit = async (values: StudentRegisterForm) => {
     try {
@@ -49,7 +59,7 @@ export default function StudentRegisterPage() {
         method: "POST",
         body: {
           ...values,
-          phone: normalizePhone(values.phone ?? ""),
+          phone: values.noPhone ? "" : normalizePhone(values.phone ?? ""),
         },
       });
       setIsRegistered(true);
@@ -93,7 +103,7 @@ export default function StudentRegisterPage() {
                 Complete seu cadastro
               </h1>
               <p className="text-sm text-muted-foreground">
-                Se sua matrícula já foi registrada pelo professor, preencha os dados abaixo para liberar os comunicados por email e WhatsApp.
+                Se sua matrícula já foi registrada pelo professor, preencha os dados abaixo para liberar os comunicados por email e, quando disponível, por WhatsApp.
               </p>
             </div>
             <FormProvider {...form}>
@@ -119,7 +129,22 @@ export default function StudentRegisterPage() {
                 <FormPhoneInput<StudentRegisterForm>
                   name="phone"
                   label="Telefone"
-                  rules={phoneRules("Informe seu telefone")}
+                  disabled={noPhone}
+                  helper={
+                    noPhone
+                      ? "Marcado como sem número de contato."
+                      : undefined
+                  }
+                  rules={{
+                    validate: (value: string) =>
+                      noPhone ||
+                      phoneRules("Informe seu telefone").validate(value),
+                  }}
+                />
+                <FormCheckbox<StudentRegisterForm>
+                  name="noPhone"
+                  label="Não possuo número de contato"
+                  description="Você ainda poderá receber avisos por email."
                 />
                 <FormCheckbox<StudentRegisterForm>
                   name="consent"

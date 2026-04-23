@@ -38,9 +38,12 @@ export type Student = {
   name?: string;
   email?: string;
   phone?: string;
+  noPhone?: boolean;
   annotation?: string;
   status?: StudentStatus;
   consent?: boolean;
+  emailDeliveryIssue?: boolean;
+  whatsappDeliveryIssue?: boolean;
 };
 
 export type SmtpInstance = {
