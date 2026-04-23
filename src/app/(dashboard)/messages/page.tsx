@@ -40,7 +40,6 @@ import { formatPhone, studentStatusLabel } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
 import { requiredTrimmed } from "@/lib/validation";
 import type {
-  ApiMessage,
   ApiResponse,
   SmtpInstance,
   Student,
@@ -55,6 +54,7 @@ const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const MAX_EMAIL_ATTACHMENTS_BYTES = 25 * 1024 * 1024;
 const MAX_WHATSAPP_ATTACHMENTS_BYTES = 15 * 1024 * 1024;
+const NO_CHANNEL_VALUE = "__none__";
 
 const toStudentArray = (value: unknown): Student[] =>
   Array.isArray(value) ? value : [];
@@ -146,6 +146,21 @@ type MessageSendPayload = MessageFormValues & {
   attachments?: Array<Pick<MessageAttachment, "fileName" | "data">>;
 };
 
+type FailedRecipient = {
+  id: string;
+  studentId: string;
+};
+
+type MessageSendData = {
+  emailsFailed: FailedRecipient[];
+  whatsappFailed: FailedRecipient[];
+};
+
+type RecentDeliveryIssue = {
+  emailFailed: boolean;
+  whatsappFailed: boolean;
+};
+
 const formatFileSize = (value: number) => {
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
@@ -171,7 +186,7 @@ const fileToBase64 = (file: File) =>
   });
 
 const attachmentsLimitLabel = (values: MessageFormValues) => {
-  if (values.whatsapp_id) {
+  if (values.whatsapp_id && values.whatsapp_id !== NO_CHANNEL_VALUE) {
     return {
       bytes: MAX_WHATSAPP_ATTACHMENTS_BYTES,
       message: `Os anexos excedem o limite total de ${formatFileSize(MAX_WHATSAPP_ATTACHMENTS_BYTES)} para envios com WhatsApp`,
@@ -182,6 +197,39 @@ const attachmentsLimitLabel = (values: MessageFormValues) => {
     bytes: MAX_EMAIL_ATTACHMENTS_BYTES,
     message: `Os anexos excedem o limite total de ${formatFileSize(MAX_EMAIL_ATTACHMENTS_BYTES)} para envios por email`,
   };
+};
+
+const hasEmailContact = (student: Student) => Boolean(student.email?.trim());
+
+const hasPhoneContact = (student: Student) => Boolean(student.phone?.trim());
+
+const normalizeChannelValue = (value: string) =>
+  value === NO_CHANNEL_VALUE ? "" : value;
+
+const availabilityLabel = (
+  student: Student,
+  emailEnabled: boolean,
+  whatsappEnabled: boolean
+) => {
+  const hasEmail = hasEmailContact(student);
+  const hasPhone = hasPhoneContact(student);
+
+  if (!emailEnabled && !whatsappEnabled) {
+    return null;
+  }
+
+  if (emailEnabled && whatsappEnabled) {
+    if (hasEmail && hasPhone) return "Recebe por email e WhatsApp";
+    if (hasEmail) return "Recebe por email";
+    if (hasPhone) return "Recebe por WhatsApp";
+    return "Sem canal disponível para este envio";
+  }
+
+  if (emailEnabled) {
+    return hasEmail ? "Recebe por email" : "Sem email para este envio";
+  }
+
+  return hasPhone ? "Recebe por WhatsApp" : "Sem WhatsApp para este envio";
 };
 
 export default function MessagesPage() {
@@ -195,6 +243,9 @@ export default function MessagesPage() {
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
   const [isProcessingAttachments, setIsProcessingAttachments] = useState(false);
+  const [recentDeliveryIssues, setRecentDeliveryIssues] = useState<
+    Record<string, RecentDeliveryIssue>
+  >({});
   const { showToast } = useToast();
   const requestedDisciplineId = searchParams.get("disciplineId") ?? "";
 
@@ -202,8 +253,8 @@ export default function MessagesPage() {
     defaultValues: {
       subject: "",
       body: "",
-      smtp_id: "",
-      whatsapp_id: "",
+      smtp_id: NO_CHANNEL_VALUE,
+      whatsapp_id: NO_CHANNEL_VALUE,
     },
   });
 
@@ -303,9 +354,19 @@ export default function MessagesPage() {
     },
   });
 
-  const sendMessageMutation = useApiMutation<ApiMessage, MessageSendPayload>({
+  const selectedSmtpId = form.watch("smtp_id");
+  const selectedWhatsappId = form.watch("whatsapp_id");
+  const emailChannelEnabled =
+    normalizeChannelValue(selectedSmtpId ?? "") !== "";
+  const whatsappChannelEnabled =
+    normalizeChannelValue(selectedWhatsappId ?? "") !== "";
+
+  const sendMessageMutation = useApiMutation<
+    ApiResponse<MessageSendData>,
+    MessageSendPayload
+  >({
     mutationFn: async (values) =>
-      apiRequest<ApiMessage>("/message/send", {
+      apiRequest<ApiResponse<MessageSendData>>("/message/send", {
         method: "POST",
         body: {
           ...values,
@@ -313,7 +374,57 @@ export default function MessagesPage() {
         },
       }),
     onSuccess: (res) => {
-      showToast({ title: res.message ?? "Mensagem enviada", variant: "success" });
+      const data = extractData(res);
+      const emailFailedIds = new Set(data.emailsFailed.map((item) => item.id));
+      const whatsappFailedIds = new Set(
+        data.whatsappFailed.map((item) => item.id)
+      );
+
+      setRecentDeliveryIssues((prev) => {
+        const next = { ...prev };
+
+        for (const studentId of validSelected) {
+          const issue = {
+            emailFailed: emailFailedIds.has(studentId),
+            whatsappFailed: whatsappFailedIds.has(studentId),
+          };
+
+          if (!issue.emailFailed && !issue.whatsappFailed) {
+            delete next[studentId];
+            continue;
+          }
+
+          next[studentId] = issue;
+        }
+
+        return next;
+      });
+
+      const partialFailureCount =
+        data.emailsFailed.length + data.whatsappFailed.length;
+      if (partialFailureCount > 0) {
+        const failureSummary = [
+          data.emailsFailed.length
+            ? `${data.emailsFailed.length} falha(s) em email`
+            : null,
+          data.whatsappFailed.length
+            ? `${data.whatsappFailed.length} falha(s) em WhatsApp`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
+        showToast({
+          title: failureSummary || "Alguns alunos não receberam a mensagem",
+          variant: "warning",
+        });
+      } else {
+        showToast({
+          title: res.message ?? "Mensagem enviada",
+          variant: "success",
+        });
+      }
+
       setAttachments([]);
       setAttachmentsError(null);
     },
@@ -414,18 +525,24 @@ export default function MessagesPage() {
   );
   const smtpOptions = useMemo(
     () =>
-      smtp.map((item) => ({
-        value: item.id,
-        label: item.email,
-      })),
+      [
+        { value: NO_CHANNEL_VALUE, label: "Não enviar por email" },
+        ...smtp.map((item) => ({
+          value: item.id,
+          label: item.email,
+        })),
+      ],
     [smtp]
   );
   const whatsappOptions = useMemo(
     () =>
-      whatsapp.map((item) => ({
-        value: item.id,
-        label: item.phone ? formatPhone(item.phone) : item.instanceName || item.id,
-      })),
+      [
+        { value: NO_CHANNEL_VALUE, label: "Não enviar por WhatsApp" },
+        ...whatsapp.map((item) => ({
+          value: item.id,
+          label: item.phone ? formatPhone(item.phone) : item.instanceName || item.id,
+        })),
+      ],
     [whatsapp]
   );
   const hasSmtp = smtpOptions.length > 0;
@@ -472,6 +589,110 @@ export default function MessagesPage() {
   const recipientsSummary = hasScope
     ? `${selectedScopeDisciplineIds.length} disciplina(s), ${selectedCampusCount} campus, ${students.length} aluno(s)`
     : "Nenhum filtro selecionado";
+  const studentsWithContext = useMemo(
+    () =>
+      students.map((student) => {
+        const recentIssue = recentDeliveryIssues[student.id];
+        const canReceiveByEmail = hasEmailContact(student);
+        const canReceiveByWhatsapp = hasPhoneContact(student);
+        const canReceiveCurrentSend =
+          (!emailChannelEnabled && !whatsappChannelEnabled) ||
+          (emailChannelEnabled && canReceiveByEmail) ||
+          (whatsappChannelEnabled && canReceiveByWhatsapp);
+        const hasCurrentChannelFailure =
+          (emailChannelEnabled && recentIssue?.emailFailed) ||
+          (whatsappChannelEnabled && recentIssue?.whatsappFailed) ||
+          false;
+
+        return {
+          ...student,
+          recentIssue,
+          canReceiveByEmail,
+          canReceiveByWhatsapp,
+          canReceiveCurrentSend,
+          hasCurrentChannelFailure,
+        };
+      }),
+    [
+      emailChannelEnabled,
+      recentDeliveryIssues,
+      students,
+      whatsappChannelEnabled,
+    ]
+  );
+  const sortedStudents = useMemo(
+    () =>
+      [...studentsWithContext].sort((a, b) => {
+        const rank = (student: (typeof studentsWithContext)[number]) => {
+          if (student.hasCurrentChannelFailure) return 0;
+          if (
+            (emailChannelEnabled || whatsappChannelEnabled) &&
+            !student.canReceiveCurrentSend
+          ) {
+            return 1;
+          }
+          return 2;
+        };
+
+        const rankDiff = rank(a) - rank(b);
+        if (rankDiff !== 0) return rankDiff;
+
+        return (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", {
+          sensitivity: "base",
+        });
+      }),
+    [emailChannelEnabled, studentsWithContext, whatsappChannelEnabled]
+  );
+  const currentChannelSummary = useMemo(() => {
+    if (!emailChannelEnabled && !whatsappChannelEnabled) {
+      return [];
+    }
+
+    const emailReachable = studentsWithContext.filter(
+      (student) => emailChannelEnabled && student.canReceiveByEmail
+    ).length;
+    const whatsappReachable = studentsWithContext.filter(
+      (student) => whatsappChannelEnabled && student.canReceiveByWhatsapp
+    ).length;
+    const availableBoth = studentsWithContext.filter(
+      (student) => student.canReceiveByEmail && student.canReceiveByWhatsapp
+    ).length;
+    const availableOnlyOne = studentsWithContext.filter(
+      (student) =>
+        Number(student.canReceiveByEmail) + Number(student.canReceiveByWhatsapp) === 1
+    ).length;
+    const unavailable = studentsWithContext.filter(
+      (student) => !student.canReceiveCurrentSend
+    ).length;
+    const recentFailures = studentsWithContext.filter(
+      (student) => student.hasCurrentChannelFailure
+    ).length;
+
+    if (emailChannelEnabled && whatsappChannelEnabled) {
+      return [
+        `${availableBoth} recebem por ambos`,
+        `${availableOnlyOne} recebem por 1 canal`,
+        `${unavailable} sem canal disponível`,
+        recentFailures ? `${recentFailures} com falha recente` : null,
+      ].filter(Boolean);
+    }
+
+    if (emailChannelEnabled) {
+      return [
+        `${emailReachable} recebem por email`,
+        `${studentsWithContext.length - emailReachable} sem email para este envio`,
+        recentFailures ? `${recentFailures} com falha recente em email` : null,
+      ].filter(Boolean);
+    }
+
+    return [
+      `${whatsappReachable} recebem por WhatsApp`,
+      `${
+        studentsWithContext.length - whatsappReachable
+      } sem WhatsApp para este envio`,
+      recentFailures ? `${recentFailures} com falha recente em WhatsApp` : null,
+    ].filter(Boolean);
+  }, [emailChannelEnabled, studentsWithContext, whatsappChannelEnabled]);
   const totalAttachmentBytes = useMemo(
     () => attachments.reduce((total, item) => total + item.size, 0),
     [attachments]
@@ -544,7 +765,13 @@ export default function MessagesPage() {
       return;
     }
 
-    if (!values.smtp_id && !values.whatsapp_id) {
+    const normalizedValues = {
+      ...values,
+      smtp_id: normalizeChannelValue(values.smtp_id),
+      whatsapp_id: normalizeChannelValue(values.whatsapp_id),
+    };
+
+    if (!normalizedValues.smtp_id && !normalizedValues.whatsapp_id) {
       showToast({
         title: "Selecione ao menos um canal de envio",
         variant: "error",
@@ -560,7 +787,7 @@ export default function MessagesPage() {
       return;
     }
 
-    const attachmentLimit = attachmentsLimitLabel(values);
+    const attachmentLimit = attachmentsLimitLabel(normalizedValues);
     if (totalAttachmentBytes > attachmentLimit.bytes) {
       setAttachmentsError(attachmentLimit.message);
       showToast({ title: attachmentLimit.message, variant: "error" });
@@ -568,7 +795,7 @@ export default function MessagesPage() {
     }
 
     await sendMessageMutation.mutateAsync({
-      ...values,
+      ...normalizedValues,
       attachments: attachments.length
         ? attachments.map(({ fileName, data }) => ({ fileName, data }))
         : undefined,
@@ -604,8 +831,8 @@ export default function MessagesPage() {
   useEffect(() => {
     const currentSmtpId = form.getValues("smtp_id");
     const currentWhatsappId = form.getValues("whatsapp_id");
-    const nextSmtpId = smtpOptions[0]?.value ?? "";
-    const nextWhatsappId = whatsappOptions[0]?.value ?? "";
+    const nextSmtpId = smtpOptions[0]?.value ?? NO_CHANNEL_VALUE;
+    const nextWhatsappId = whatsappOptions[0]?.value ?? NO_CHANNEL_VALUE;
 
     if (!smtpOptions.some((option) => option.value === currentSmtpId)) {
       form.setValue("smtp_id", nextSmtpId);
@@ -813,6 +1040,11 @@ export default function MessagesPage() {
               <p className="mt-1 text-xs text-muted-foreground">
                 Todos entram selecionados; remova quem não deve receber.
               </p>
+              {currentChannelSummary.length ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {currentChannelSummary.join(" · ")}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -825,7 +1057,7 @@ export default function MessagesPage() {
                 description="Selecione um campus inteiro ou uma ou mais disciplinas para carregar os alunos."
               />
             ) : students.length ? (
-              students.map((student) => (
+              sortedStudents.map((student) => (
                 <button
                   key={student.id}
                   type="button"
@@ -834,6 +1066,13 @@ export default function MessagesPage() {
                     selected.includes(student.id)
                       ? "border-primary bg-primary/10"
                       : "border-border/60 bg-background"
+                  } ${
+                    student.hasCurrentChannelFailure
+                      ? "ring-1 ring-amber-300"
+                      : (emailChannelEnabled || whatsappChannelEnabled) &&
+                          !student.canReceiveCurrentSend
+                        ? "ring-1 ring-amber-200/80"
+                        : ""
                   }`}
                 >
                   <Checkbox
@@ -847,12 +1086,38 @@ export default function MessagesPage() {
                     <p className="text-xs text-muted-foreground">
                       {student.email ?? "-"} · {formatPhone(student.phone)}
                     </p>
+                    {availabilityLabel(
+                      student,
+                      emailChannelEnabled,
+                      whatsappChannelEnabled
+                    ) ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {availabilityLabel(
+                          student,
+                          emailChannelEnabled,
+                          whatsappChannelEnabled
+                        )}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-xs text-muted-foreground">
                       {audienceContextLabel(student)} ·{" "}
                       {formatAudienceList(student.disciplineNames)}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-2">
+                    {student.hasCurrentChannelFailure ? (
+                      <Badge variant="outline" className="border-amber-300 bg-amber-100 text-xs text-amber-950">
+                        Falha recente
+                      </Badge>
+                    ) : (emailChannelEnabled || whatsappChannelEnabled) &&
+                      !student.canReceiveCurrentSend ? (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-200 bg-amber-50 text-xs text-amber-950"
+                      >
+                        Sem alcance
+                      </Badge>
+                    ) : null}
                     <Badge variant="outline" className="text-xs">
                       {studentStatusLabel(student.status)}
                     </Badge>
