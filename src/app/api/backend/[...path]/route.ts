@@ -34,6 +34,8 @@ const appBaseUrl = () =>
   process.env.NEXTAUTH_URL ??
   DEFAULT_APP_URL;
 
+const usesSecureCookies = () => appBaseUrl().startsWith("https://");
+
 const allowedOrigins = () =>
   [
     appBaseUrl(),
@@ -152,6 +154,7 @@ const proxy = async (
     : ((await getToken({
         req: request,
         secret: process.env.AUTH_SECRET,
+        secureCookie: usesSecureCookies(),
       })) as BackendToken | null);
 
   if (
