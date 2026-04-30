@@ -100,6 +100,14 @@ const buildHeaders = (request: NextRequest, token: BackendToken | null) => {
   headers.delete("host");
   headers.delete("cookie");
   headers.delete("content-length");
+  headers.delete("connection");
+  headers.delete("keep-alive");
+  headers.delete("proxy-authenticate");
+  headers.delete("proxy-authorization");
+  headers.delete("te");
+  headers.delete("trailer");
+  headers.delete("transfer-encoding");
+  headers.delete("upgrade");
 
   if (token?.accessToken) {
     headers.set("Authorization", `Bearer ${token.accessToken}`);
