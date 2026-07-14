@@ -54,6 +54,7 @@ type ConnectResponse = {
   message?: string;
   pairingCode?: string;
   code?: string;
+  qrCode?: string;
   base64?: string;
   count?: number;
   qrcode?: { code?: string; base64?: string };
@@ -314,7 +315,13 @@ export default function IntegrationsPage() {
   });
 
   const resolveQrImage = (data?: ConnectResponse | null) => {
-    const raw = data?.base64 || data?.qrcode?.base64 || "";
+    const raw =
+      data?.base64 ||
+      data?.qrcode?.base64 ||
+      data?.qrCode ||
+      data?.code ||
+      data?.qrcode?.code ||
+      "";
     if (!raw) return "";
     if (raw.startsWith("data:image")) return raw;
     return `data:image/png;base64,${raw}`;
